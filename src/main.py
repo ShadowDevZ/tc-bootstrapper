@@ -7,6 +7,8 @@ from urllib.parse import urljoin
 CONFIG_URL_BINUTILS="https://ftp.gnu.org/gnu/binutils"
 CONFIG_URL_TOOLCHAIN="https://ftp.gnu.org/gnu/gcc/"
 
+GNU_GPG_KEYRING="https://ftp.gnu.org/gnu/gnu-keyring.gpg"
+
 def get_files(url, allowed_extensions=None):
     response = requests.get(url)
     
