@@ -1,3 +1,5 @@
 __pycache__
 *.todo
 *.old
+*.vscode
+*.code
