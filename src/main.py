@@ -6,6 +6,7 @@ import pathlib
 import urllib.request
 import urllib.parse
 import urllib.error
+import sys
 CONFIG_URL_BINUTILS="https://ftp.gnu.org/gnu/binutils"
 CONFIG_URL_TOOLCHAIN="https://ftp.gnu.org/gnu/gcc/"
 
@@ -99,12 +100,20 @@ def GetGccUrl(mflags=0, Filter=None):
     
     return None
 
-DOWNLOAD_SOURCE_OVERWRITE = 1 << 1
-DOWNLOAD_SOURCE_VERIFY_PGP = 1 << 2
 
+def urllib_progress_report(block_num, block_size, total_size):
+    download_size = (block_num * block_size) / 1024
+    
+     
+    print("Downloaded [{0}KiB/{1}KiB]".format(round(download_size,2), round(total_size / 1024, 2)))
+  #  sys.stdout.flush()
+    print('\033[F\033[K', end='')
+    
+    
+DOWNLOAD_SOURCE_OVERWRITE = 1 << 1
 DOWNLOAD_SOURCE_RET_SRC_EXISTS = 2
-DOWNLOAD_SOURCE_RET_SUCCESS = 0
 DOWNLOAD_SOURCE_RET_SRC_FAIL = 1
+DOWNLOAD_SOURCE_RET_SUCCESS = 0
 def DownloadSource(uri, dest, dflags=0):
     
     if (not (dflags & DOWNLOAD_SOURCE_OVERWRITE)): 
@@ -125,7 +134,8 @@ def DownloadSource(uri, dest, dflags=0):
     
     try:
         print("Downloading {0} to {1}".format(uri.split('/')[-1], dest))
-        urllib.request.urlretrieve(uri, dest)
+        
+        urllib.request.urlretrieve(uri, dest, urllib_progress_report)
         print("Download complete")
     except urllib.error.URLError as e:
         print("URLLIB Error while downloading file: " + str(e))
