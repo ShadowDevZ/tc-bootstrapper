@@ -1,3 +1,4 @@
+import subprocess
 import menu
 import os
 import requests
@@ -204,29 +205,73 @@ AT_GCC_INSTALL="make install-gcc && make install-target-libgcc"
 
 #prefix=install path
 #target=architecture
-COMPILE_TARGET_X86="i686-elf"
-COMPILE_TARGET_AMD64="x86_64-elf"
+
 
 
 def xcall(cmd, cwd):
-    ret = call(cmd, cwd=cwd,shell=True)
-    if (ret != 0):
-        print("Failed to execute build command!, command returned " + str(ret))
-        os.abort()
+    envi = os.environ.copy()
+    envi["PATH"] = f"/home/shadow/Projects/TcBootstrapper/downloaded/install/binutils-2.41/bin:{envi['PATH']}" 
+    print(cmd)
+    ret = subprocess.Popen(cmd, env=envi, shell=True, cwd=cwd, stderr=subprocess.PIPE, stdout=subprocess.PIPE,encoding='utf-8',universal_newlines=True)
+  #  stdout, stderr = ret.communicate()
+    
+    while True:
+        ln = ret.stdout.readline()
+        lne = ret.stderr.readline()
+        if not ln and not lne:
+            break
+        if ln:
+            pass
+      #      print(ln, end='')
+        
+        if lne:
+            print(lne, end='')
+    
+    exitcode = ret.wait()
+ #   ret = call(cmd, cwd=cwd,shell=True)
+    
+    
+    if (exitcode != 0):
+        print("Failed to execute build command!, command returned " + str(exitcode))
+        sys.exit(1)
 
-def CompileTargetBinutils(src,prefix,target):
+def CompileTargetBinutils(src,prefix,target, nproc):
+    
+    if (not os.path.exists(src)):
+        os.mkdir(src)
+
     
     #bad approach however we have only 2 options and there wont be more so we do not need a parser
+    #todo do it once then substring so i dont need to call this also from the gcc target
     binutilsConfig = AT_BINUTILS_CONFIG.replace("--target=$AUTO_TARGET", f"--target={target}")
-    binutilsConfig = AT_BINUTILS_CONFIG.replace("--prefix=$AUTO_PREFIX", f"--target={prefix}")
+    binutilsConfig = binutilsConfig.replace("--prefix=$AUTO_PREFIX", f"--prefix={prefix}")
     
+   # print(binutilsConfig)
     xcall(binutilsConfig, src)
     
+    binutilsMake  = AT_BINUTILS_MAKE.replace("$AUTO_CORE", f"{nproc}")
+    xcall(binutilsMake, src)
+    xcall(AT_BINUTILS_INSTALL, src)
     
-    
-    
-    pass
 
 
-def CompileTargetsGcc(src,target, njobs):
-    pass
+def CompileTargetGcc(src,prefix,target, nproc):
+    if (not os.path.exists(src)):
+        os.mkdir(src)
+
+    
+    #bad approach however we have only 2 options and there wont be more so we do not need a parser
+    gccConfig = AT_GCC_CONFIG.replace("--target=$AUTO_TARGET", f"--target={target}")
+    gccConfig = gccConfig.replace("--prefix=$AUTO_PREFIX", f"--prefix={prefix}")
+    
+   # print(binutilsConfig)
+    xcall(gccConfig, src)
+    
+    gccMake  = AT_GCC_MAKE.replace("$AUTO_CORE", f"{nproc}")
+  #  print(gccMake)
+  #  abort()
+   
+    
+    xcall(gccMake, src)
+    xcall(AT_GCC_INSTALL, src)
+    
