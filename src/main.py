@@ -99,36 +99,49 @@ def GetGccUrl(mflags=0, Filter=None):
     
     return None
 
-def DownloadSource(uri, dest, VerifyPGP=True):
-    try:
-        urllib.request.urlopen(uri, timeout=5)
-        print(f"{0} - [OK] (0)", uri)
-    except urllib.error.URLError as e:
-        print(f"{0} - [FAIL] ({1})", uri, e)
-        return False
-    except Exception as e:
-        print(f"An error occurred while checking remote source: {e}")
-        return False
+DOWNLOAD_SOURCE_OVERWRITE = 1 << 1
+DOWNLOAD_SOURCE_VERIFY_PGP = 1 << 2
+
+DOWNLOAD_SOURCE_RET_SRC_EXISTS = 2
+DOWNLOAD_SOURCE_RET_SUCCESS = 0
+DOWNLOAD_SOURCE_RET_SRC_FAIL = 1
+def DownloadSource(uri, dest, dflags=0):
+    
+    if (not (dflags & DOWNLOAD_SOURCE_OVERWRITE)): 
+        if (os.path.exists(dest)):
+            print("{0} already exists, not overwriting".format(dest))
+            return DOWNLOAD_SOURCE_RET_SRC_EXISTS
+        
     
     try:
-        print("Downloading {0} to {1}", uri.split('/')[-1], dest)
+        urllib.request.urlopen(uri, timeout=5)
+        print("{0} - [OK] (0)".format(uri))
+    except urllib.error.URLError as e:
+        print("{0} - [FAIL] ({1})".format(uri, e))
+        return DOWNLOAD_SOURCE_RET_SRC_FAIL
+    except Exception as e:
+        print(f"An error occurred while checking remote source: {e}")
+        return DOWNLOAD_SOURCE_RET_SRC_FAIL
+    
+    try:
+        print("Downloading {0} to {1}".format(uri.split('/')[-1], dest))
         urllib.request.urlretrieve(uri, dest)
         print("Download complete")
     except urllib.error.URLError as e:
         print("URLLIB Error while downloading file: " + str(e))
-        return False
+        return DOWNLOAD_SOURCE_RET_SRC_FAIL
     except Exception as e:
         print(f"An error occurred while downloading remote source: {e}")
-        return False
+        return DOWNLOAD_SOURCE_RET_SRC_FAIL
 
-    return True
+    return DOWNLOAD_SOURCE_RET_SUCCESS
         
         
         
 TC_DEBUG_DOWNLOAD_PATH="/home/shadow/Projects/TcBootstrapper/downloaded/"
-#DownloadSource(GetBinUtilsUrl(menu.DISP_MENU_LATEST), TC_DEBUG_DOWNLOAD_PATH+"binutils.tar")
-#DownloadSource(GetGccUrl(menu.DISP_MENU_LATEST), TC_DEBUG_DOWNLOAD_PATH+"gcc.tar")
-print(GetBinUtilsUrl())
+DownloadSource(GetBinUtilsUrl(menu.DISP_MENU_LATEST), TC_DEBUG_DOWNLOAD_PATH+"binutils.tar")
+DownloadSource(GetGccUrl(menu.DISP_MENU_LATEST), TC_DEBUG_DOWNLOAD_PATH+"gcc.tar")
+#print(GetBinUtilsUrl())
 #print(GetGccUrl(menu.DISP_MENU_LATEST))
 
 #print(menu.DisplayMenu("gcc",directories))
