@@ -5,7 +5,8 @@ __pycache__/
 
 # C extensions
 *.so
-
+*.gz
+*.xz
 # Distribution / packaging
 .Python
 build/
@@ -163,3 +164,4 @@ cython_debug/
 *.bz2
 *.o
 *.test
+downloaded/*

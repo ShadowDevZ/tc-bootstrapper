@@ -1,4 +1,3 @@
-l = ["menu.com/f1.a", "menu.com/f2.b", "menu.com/f3.c"]
 #
 import pathlib
 #lst -> list of links
@@ -10,7 +9,7 @@ DISP_MENU_LATEST = 1 << 1
 
 
 def DisplayMenu(title, lst, mflags, filter=None):
-    print(">>> Setting up " + title)
+#    print(">>> Setting up " + title)
     i = 0
     
     

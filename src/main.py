@@ -1,161 +1,42 @@
 import menu
-import os
-import requests
-from bs4 import BeautifulSoup
-import pathlib
-import urllib.request
-import urllib.parse
-import urllib.error
 import sys
-CONFIG_URL_BINUTILS="https://ftp.gnu.org/gnu/binutils"
-CONFIG_URL_TOOLCHAIN="https://ftp.gnu.org/gnu/gcc/"
-
-GNU_GPG_KEYRING="https://ftp.gnu.org/gnu/gnu-keyring.gpg"
-
-def get_files(url, allowed_extensions=None):
-    response = requests.get(url)
-    
-    if response.status_code == 200:
-        soup = BeautifulSoup(response.text, 'html.parser')
-        files = []
-
-        # Extract href attributes from anchor tags
-        for a_tag in soup.find_all('a', href=True):
-            href = a_tag['href']
-            
-            # Join the URL to handle relative paths
-           
-         
-            full_url = url + "/" + href
-           
-            # Check if the link points to a file based on its extension
-            if allowed_extensions is None or any(full_url.lower().endswith(ext) for ext in allowed_extensions):
-                files.append(full_url)
-
-        return files
-    else:
-        print(f"Failed to retrieve content from {url}. Status code: {response.status_code}")
-        return []
-
-
-
-def get_directories(url):
-    response = requests.get(url)
-    
-    if response.status_code == 200:
-        soup = BeautifulSoup(response.text, 'html.parser')
-        directories = []
-
-        # Extract href attributes from anchor tags that point to directories
-        for a_tag in soup.find_all('a', href=True):
-            href = a_tag['href']
-            
-            # Join the URL to handle relative paths
-            full_url = urllib.parse.urljoin(url, href)
-            
-            # Check if it ends with a '/' to identify directories
-            if full_url.endswith('/'):
-                directories.append(full_url)
-
-        return directories
-    else:
-        print(f"Failed to retrieve content from {url}. Status code: {response.status_code}")
-        return []
-
-
-
-def GetOutDir():
-    inpl = ".te.mp/"
-    
-    while not os.path.isdir(inpl) or (inpl[-1] == '/'):
-        inpl = input("Out Directory: ")
-    return inpl
-
-
-def GetBinUtilsUrl(mflags = 0,Filter=None):
-    if (Filter == None):
-        Filter = [".tar.xz", ".tar.lz", ".tar.gz", ".tar.bz2"]
-    
-    files = get_files(CONFIG_URL_BINUTILS, Filter)
-    
-    v = menu.DisplayMenu("binutils",files, mflags)
-    return v
-
-def splitpath(stri, index):
-    return '.' + stri.split('.')[index]
-
-def GetGccUrl(mflags=0, Filter=None):
-    directories = get_directories(CONFIG_URL_TOOLCHAIN)
-    ch = menu.DisplayMenu("gcc",directories, mflags)
-    files = get_files(ch)
-    if (Filter == None):
-        Filter = [".tar.xz", ".tar.lz", ".tar.gz", ".tar.bz2"]
-    
-    for file in files:
-        for ext in Filter:
-
-            if (splitpath(ext, -2) in file):
-             if (splitpath(ext, -1) == pathlib.Path(file).suffix):
-                    return file
-    
-    return None
-
-
-def urllib_progress_report(block_num, block_size, total_size):
-    download_size = (block_num * block_size) / 1024
-    
-     
-    print("Downloaded [{0}KiB/{1}KiB]".format(round(download_size,2), round(total_size / 1024, 2)))
-  #  sys.stdout.flush()
-    print('\033[F\033[K', end='')
-    
-    
-DOWNLOAD_SOURCE_OVERWRITE = 1 << 1
-DOWNLOAD_SOURCE_RET_SRC_EXISTS = 2
-DOWNLOAD_SOURCE_RET_SRC_FAIL = 1
-DOWNLOAD_SOURCE_RET_SUCCESS = 0
-def DownloadSource(uri, dest, dflags=0):
-    
-    if (not (dflags & DOWNLOAD_SOURCE_OVERWRITE)): 
-        if (os.path.exists(dest)):
-            print("{0} already exists, not overwriting".format(dest))
-            return DOWNLOAD_SOURCE_RET_SRC_EXISTS
-        
-    
-    try:
-        urllib.request.urlopen(uri, timeout=5)
-        print("{0} - [OK] (0)".format(uri))
-    except urllib.error.URLError as e:
-        print("{0} - [FAIL] ({1})".format(uri, e))
-        return DOWNLOAD_SOURCE_RET_SRC_FAIL
-    except Exception as e:
-        print(f"An error occurred while checking remote source: {e}")
-        return DOWNLOAD_SOURCE_RET_SRC_FAIL
-    
-    try:
-        print("Downloading {0} to {1}".format(uri.split('/')[-1], dest))
-        
-        urllib.request.urlretrieve(uri, dest, urllib_progress_report)
-        print("Download complete")
-    except urllib.error.URLError as e:
-        print("URLLIB Error while downloading file: " + str(e))
-        return DOWNLOAD_SOURCE_RET_SRC_FAIL
-    except Exception as e:
-        print(f"An error occurred while downloading remote source: {e}")
-        return DOWNLOAD_SOURCE_RET_SRC_FAIL
-
-    return DOWNLOAD_SOURCE_RET_SUCCESS
-        
-        
-        
+import build
+import multiprocessing
 TC_DEBUG_DOWNLOAD_PATH="/home/shadow/Projects/TcBootstrapper/downloaded/"
-DownloadSource(GetBinUtilsUrl(menu.DISP_MENU_LATEST), TC_DEBUG_DOWNLOAD_PATH+"binutils.tar")
-DownloadSource(GetGccUrl(menu.DISP_MENU_LATEST), TC_DEBUG_DOWNLOAD_PATH+"gcc.tar")
-#print(GetBinUtilsUrl())
-#print(GetGccUrl(menu.DISP_MENU_LATEST))
+TC_DEBUG_EXTRACT_PATH="/home/shadow/Projects/TcBootstrapper/downloaded/work"
 
-#print(menu.DisplayMenu("gcc",directories))
 
-#outDir = GetOutDir() + "/work"
-#print(outDir)
+def GetCoreCount():
+    while (True):
+             try:
+                 inp = int(input(f"Number of jobs (1-{multiprocessing.cpu_count()}): "))
+                 if (inp >= 0 and inp <= multiprocessing.cpu_count()):
+                     break
+             except ValueError:
+                 continue
+    
+    return inp
+g_CpuCount = GetCoreCount()
+
+
+print(">>Setting up binutils")
+binutils_build = build.GetBinUtilsUrl(menu.DISP_MENU_LATEST)
+binutils_version = binutils_build.split('/')[-1]
+
+build.DownloadSource(binutils_build, TC_DEBUG_DOWNLOAD_PATH + binutils_version)
+
+
+print(">>Unpacking Binutils")
+build.UnpackSource(TC_DEBUG_DOWNLOAD_PATH + binutils_version, TC_DEBUG_EXTRACT_PATH)
+
+#build.CompileTargetBinutils()
+
+
+'''
+gcc_build = build.GetGccUrl(menu.DISP_MENU_LATEST)
+gcc_version = gcc_build.split('/')[-1]
+print(">>Setting up GCC")
+build.DownloadSource(gcc_build, TC_DEBUG_DOWNLOAD_PATH+gcc_version)
+
+'''
 
