@@ -6,6 +6,7 @@ import multiprocessing
 TC_DEBUG_DOWNLOAD_PATH="/home/shadow/Projects/TcBootstrapper/downloaded/"
 TC_DEBUG_EXTRACT_PATH="/home/shadow/Projects/TcBootstrapper/downloaded/work/"
 TC_DEBUG_INSTALL_PATH="/home/shadow/Projects/TcBootstrapper/downloaded/install/"
+TC_DEBUG_STAMP_PATH="/home/shadow/Projects/TcBootstrapper/downloaded/work/"
 COMPILE_TARGET_X86="i686-elf"
 COMPILE_TARGET_AMD64="x86_64-elf"
 def GetCoreCount():
@@ -29,23 +30,27 @@ def CutString(stri, substr):
     return stri
 
 
+
+
 print(">>Setting up binutils")
 binutils_build = build.GetBinUtilsUrl(menu.DISP_MENU_LATEST)
 binutils_version = binutils_build.split('/')[-1]
-print(binutils_build)
-#build.DownloadSource(binutils_build, TC_DEBUG_DOWNLOAD_PATH + binutils_version)
+
+
+build.DownloadSource(binutils_build, TC_DEBUG_DOWNLOAD_PATH + binutils_version,TC_DEBUG_STAMP_PATH)
 
 
 #print(">>Unpacking Binutils")
-#build.UnpackSource(TC_DEBUG_DOWNLOAD_PATH + binutils_version, TC_DEBUG_EXTRACT_PATH)
+build.UnpackSource(TC_DEBUG_DOWNLOAD_PATH + binutils_version, TC_DEBUG_EXTRACT_PATH)
 
 if (not os.path.exists(TC_DEBUG_INSTALL_PATH)):
     os.mkdir(TC_DEBUG_INSTALL_PATH)
 
 binutils_dir = CutString(binutils_version ,".tar.")
 
+build_stamp = TC_DEBUG_EXTRACT_PATH + ".notice"
 
-#build.CompileTargetBinutils(TC_DEBUG_EXTRACT_PATH + binutils_dir,  TC_DEBUG_INSTALL_PATH, COMPILE_TARGET_AMD64, g_CpuCount)
+#build.CompileTargetBinutils(TC_DEBUG_EXTRACT_PATH + "/binutils_build",  TC_DEBUG_INSTALL_PATH, COMPILE_TARGET_AMD64, g_CpuCount, binutils_dir, build_stamp)
 #print(">>Binutils compiled")
 
 
@@ -54,14 +59,15 @@ gcc_build = build.GetGccUrl(menu.DISP_MENU_LATEST)
 gcc_version = gcc_build.split('/')[-1]
 #print(">>Setting up GCC")
 print(gcc_build)
-build.DownloadSource(gcc_build, TC_DEBUG_DOWNLOAD_PATH+gcc_version)
+#build.DownloadSource(gcc_build, TC_DEBUG_DOWNLOAD_PATH+gcc_version, TC_DEBUG_STAMP_PATH)
 
 gcc_dir = CutString(gcc_version, ".tar.")
 print(">>Unpacking GCC")
 #build.UnpackSource(TC_DEBUG_DOWNLOAD_PATH + gcc_version, TC_DEBUG_EXTRACT_PATH)
 
-#build.CompileTargetGcc(TC_DEBUG_EXTRACT_PATH + "/gcc_build",  TC_DEBUG_INSTALL_PATH, COMPILE_TARGET_AMD64, g_CpuCount, gcc_dir)
+#build.CompileTargetGcc(TC_DEBUG_EXTRACT_PATH + "/gcc_build",  TC_DEBUG_INSTALL_PATH, COMPILE_TARGET_AMD64, g_CpuCount, gcc_dir, build_stamp)
 print(">>GCC compiled")
 
-#build.WriteToNoticeStampDir(TC_DEBUG_EXTRACT_PATH + ".notice", "/home/shadow/Projects/TcBootstrapper/downloaded/work/gcc-13.2.0", 'D')
 
+build.CleanupTree(TC_DEBUG_STAMP_PATH)
+build.DeleteNoticeStamp(build_stamp)
