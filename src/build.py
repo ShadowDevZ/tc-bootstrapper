@@ -212,22 +212,22 @@ def DownloadSource(uri: str, dest: str, stamp: str, dflags: int=0) -> int:
     
     if (not (dflags & DOWNLOAD_SOURCE_OVERWRITE)): 
         if (os.path.exists(dest)):
-            print("{0} already exists, not overwriting".format(dest))
+            print(f"{dest} already exists, not overwriting")
             return DOWNLOAD_SOURCE_RET_SRC_EXISTS
         
     
     try:
         urllib.request.urlopen(uri, timeout=5)
-        print("{0} - [OK] (0)".format(uri))
+        print(f"{uri} - [OK] (0)")
     except urllib.error.URLError as e:
-        print("{0} - [FAIL] ({1})".format(uri, e))
+        print(f"{uri} - [FAIL] ({e})")
         return DOWNLOAD_SOURCE_RET_SRC_FAIL
     except Exception as e:
         print(f"An error occurred while checking remote source: {e}")
         return DOWNLOAD_SOURCE_RET_SRC_FAIL
     
     try:
-        print("Downloading {0} to {1}".format(uri.split('/')[-1], dest))
+        print(f"Downloading {uri.split('/')[-1]} to {dest}")
         
         urllib.request.urlretrieve(uri, dest, urllib_progress_report)
         print("Download complete")
