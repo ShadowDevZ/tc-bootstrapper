@@ -32,7 +32,7 @@ def CutString(stri, substr):
 print(">>Setting up binutils")
 binutils_build = build.GetBinUtilsUrl(menu.DISP_MENU_LATEST)
 binutils_version = binutils_build.split('/')[-1]
-
+print(binutils_build)
 #build.DownloadSource(binutils_build, TC_DEBUG_DOWNLOAD_PATH + binutils_version)
 
 
@@ -45,7 +45,7 @@ if (not os.path.exists(TC_DEBUG_INSTALL_PATH)):
 binutils_dir = CutString(binutils_version ,".tar.")
 
 
-#build.CompileTargetBinutils(TC_DEBUG_EXTRACT_PATH + binutils_dir,  TC_DEBUG_INSTALL_PATH + binutils_dir, COMPILE_TARGET_AMD64, g_CpuCount)
+#build.CompileTargetBinutils(TC_DEBUG_EXTRACT_PATH + binutils_dir,  TC_DEBUG_INSTALL_PATH, COMPILE_TARGET_AMD64, g_CpuCount)
 #print(">>Binutils compiled")
 
 
@@ -53,15 +53,15 @@ binutils_dir = CutString(binutils_version ,".tar.")
 gcc_build = build.GetGccUrl(menu.DISP_MENU_LATEST)
 gcc_version = gcc_build.split('/')[-1]
 #print(">>Setting up GCC")
-#build.DownloadSource(gcc_build, TC_DEBUG_DOWNLOAD_PATH+gcc_version)
-
-
-print(">>Unpacking GCC")
-build.UnpackSource(TC_DEBUG_DOWNLOAD_PATH + gcc_version, TC_DEBUG_EXTRACT_PATH)
+print(gcc_build)
+build.DownloadSource(gcc_build, TC_DEBUG_DOWNLOAD_PATH+gcc_version)
 
 gcc_dir = CutString(gcc_version, ".tar.")
+print(">>Unpacking GCC")
+#build.UnpackSource(TC_DEBUG_DOWNLOAD_PATH + gcc_version, TC_DEBUG_EXTRACT_PATH)
 
-build.CompileTargetGcc(TC_DEBUG_EXTRACT_PATH + gcc_dir,  TC_DEBUG_INSTALL_PATH + gcc_dir, COMPILE_TARGET_AMD64, g_CpuCount)
+#build.CompileTargetGcc(TC_DEBUG_EXTRACT_PATH + "/gcc_build",  TC_DEBUG_INSTALL_PATH, COMPILE_TARGET_AMD64, g_CpuCount, gcc_dir)
 print(">>GCC compiled")
 
+#build.WriteToNoticeStampDir(TC_DEBUG_EXTRACT_PATH + ".notice", "/home/shadow/Projects/TcBootstrapper/downloaded/work/gcc-13.2.0", 'D')
 
