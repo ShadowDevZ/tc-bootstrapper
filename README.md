@@ -12,9 +12,11 @@ all of the TC_DEBUG* macros are here just for the development rest are going to 
 either from STDIN or the ARGV
 
 # Major todo
-- Add PGP key verification
+- Fix timestamp error
+- Effective way to use timestamp to prevent multiple verifications
 - Fix path bugs when calling function eg. path is /path//file instead od /path/file
 - Better output
 - Refactor code
 - Make this work on non POSIX compliant systems
+- Stop using print statements inside internal function or make them debug only
 - add `requirements.txt` for the pip

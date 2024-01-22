@@ -17,7 +17,7 @@ CONFIG_URL_TOOLCHAIN="https://ftp.gnu.org/gnu/gcc/"
 GNU_GPG_KEYRING="https://ftp.gnu.org/gnu/gnu-keyring.gpg"
 
 
-        
+TIMESTAMP_EMPTY = ""
 
 
 
@@ -239,12 +239,13 @@ def DownloadSource(uri: str, dest: str, stamp: str, dflags: int=0) -> int:
         return DOWNLOAD_SOURCE_RET_SRC_FAIL
 
     
-    if (not CheckStamp(stamp+ ".notice")):
-        if (not CreateNoticeStamp(stamp)):
-            return DOWNLOAD_SOURCE_RET_STAMP_FAIL
+    if (stamp != ""):
+        if (not CheckStamp(stamp+ ".notice")):
+            if (not CreateNoticeStamp(stamp)):
+                return DOWNLOAD_SOURCE_RET_STAMP_FAIL
     
-    if (not WriteToNoticeStampDir(stamp+ ".notice", dest, 'A')):
-            return DOWNLOAD_SOURCE_RET_STAMP_FAIL
+        if (not WriteToNoticeStampDir(stamp+ ".notice", dest, 'A')):
+                return DOWNLOAD_SOURCE_RET_STAMP_FAIL
 
     return DOWNLOAD_SOURCE_RET_SUCCESS
         
@@ -432,4 +433,50 @@ def CleanupTree(src: str) -> bool:
         
                 
                 
+def DownloadGPGKeychain(remSig: str, downloadPath: str):
+    #download the keychain
+    retVal = DownloadSource(GNU_GPG_KEYRING, downloadPath, TIMESTAMP_EMPTY)
+    if (retVal == DOWNLOAD_SOURCE_RET_SRC_EXISTS or retVal == DOWNLOAD_SOURCE_RET_SUCCESS):
+        return True
+    
+    return False
+
+def DownloadDetachedSignature(uri: str, downloadPath: str):
+    
+    signature = uri + ".sig"
+    print(signature)
+    retVal = DownloadSource(signature, downloadPath , TIMESTAMP_EMPTY)
+    if (retVal == DOWNLOAD_SOURCE_RET_SRC_EXISTS or retVal == DOWNLOAD_SOURCE_RET_SUCCESS):
+        return True
+    
+    return False
+
+import gnupg
+
+def VerifyPGP(signature: str, file: str, gpghome: str, keychain: str):
+
+    
+    if (not os.path.exists(gpghome)):
+        os.makedirs(gpghome, mode=0o700)
+   
         
+    
+    if (not os.path.isdir(gpghome)):
+        return -2
+    
+   # if (len(os.listdir(gpghome)) != 0):
+ #       return -3
+    
+    gpg = gnupg.GPG(gnupghome=gpghome)
+    gpg.import_keys_file(keychain)
+    
+    f = open(signature, 'rb')
+   
+    ires = gpg.verify_file(f, file, close_file=True)
+    if (ires.valid):
+        return True, "SUCCESS"
+    return False, ires.status
+    
+   # shutil.rmtree(gpghome)
+  
+    
