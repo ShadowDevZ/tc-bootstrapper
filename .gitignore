@@ -163,5 +163,6 @@ cython_debug/
 *.xz
 *.bz2
 *.o
+*.todo
 *.test
 downloaded/*
