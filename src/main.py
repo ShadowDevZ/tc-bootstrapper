@@ -23,7 +23,7 @@ def GetCoreCount():
     return inp
 g_CpuCount = GetCoreCount()
 
-def CutString(stri, substr):
+def CutString(stri, substr) -> str:
     
     idx = stri.find(substr)
     if (idx != -1):
