@@ -10,6 +10,7 @@ TC_DEBUG_INSTALL_PATH="/home/shadow/Projects/TcBootstrapper/downloaded/install/"
 TC_DEBUG_STAMP_PATH="/home/shadow/Projects/TcBootstrapper/downloaded/work/"
 COMPILE_TARGET_X86="i686-elf"
 COMPILE_TARGET_AMD64="x86_64-elf"
+TC_DEBUG_BUILD_STAMP = TC_DEBUG_EXTRACT_PATH + ".notice"
 def GetCoreCount():
     while (True):
              try:
@@ -31,8 +32,10 @@ def CutString(stri, substr):
     return stri
 
 
+build.mkdir_if_not_exists(TC_DEBUG_STAMP_PATH)
+build.CreateNoticeStamp(TC_DEBUG_STAMP_PATH)
 print(">>Downloading keychain")
-build.DownloadGPGKeychain(build.GNU_GPG_KEYRING, TC_DEBUG_DOWNLOAD_PATH + "/gnu-keyring.gpg")
+build.DownloadGPGKeychain(build.GNU_GPG_KEYRING, TC_DEBUG_DOWNLOAD_PATH + "/gnu-keyring.gpg", TC_DEBUG_BUILD_STAMP)
 
 
 print(">>Setting up binutils")
@@ -50,10 +53,10 @@ build.DownloadSource(binutils_build, TC_DEBUG_DOWNLOAD_PATH + binutils_version,T
 
 
 
-build.DownloadDetachedSignature(binutils_build, TC_DEBUG_DOWNLOAD_PATH + binutils_version + ".sig")
+build.DownloadDetachedSignature(binutils_build, TC_DEBUG_DOWNLOAD_PATH + binutils_version + ".sig", TC_DEBUG_BUILD_STAMP)
 
 
-sig,errmsg = build.VerifyPGP(TC_DEBUG_DOWNLOAD_PATH + binutils_version + ".sig",TC_DEBUG_DOWNLOAD_PATH + binutils_version, TC_DEBUG_KEYCHAAIN_PATH, TC_DEBUG_DOWNLOAD_PATH + "gnu-keyring.gpg")
+sig,errmsg = build.VerifyPGP(TC_DEBUG_DOWNLOAD_PATH + binutils_version + ".sig",TC_DEBUG_DOWNLOAD_PATH + binutils_version, TC_DEBUG_KEYCHAAIN_PATH, TC_DEBUG_DOWNLOAD_PATH + "gnu-keyring.gpg", TC_DEBUG_BUILD_STAMP)
 if (not sig):
     print("GPG verification failed for binutils")
     print("message: ", errmsg)
@@ -67,21 +70,20 @@ print(">>Unpacking Binutils")
 
 build.UnpackSource(TC_DEBUG_DOWNLOAD_PATH + binutils_version, TC_DEBUG_EXTRACT_PATH)
 
-if (not os.path.exists(TC_DEBUG_INSTALL_PATH)):
-    os.mkdir(TC_DEBUG_INSTALL_PATH)
+build.mkdir_if_not_exists(TC_DEBUG_INSTALL_PATH)
 
 binutils_dir = CutString(binutils_version ,".tar.")
 
-build_stamp = TC_DEBUG_EXTRACT_PATH + ".notice"
 
 
 
 
-build.CompileTargetBinutils(TC_DEBUG_EXTRACT_PATH + "/binutils_build",  TC_DEBUG_INSTALL_PATH, COMPILE_TARGET_AMD64, g_CpuCount, binutils_dir, build_stamp)
+
+build.CompileTargetBinutils(TC_DEBUG_EXTRACT_PATH + "/binutils_build",  TC_DEBUG_INSTALL_PATH, COMPILE_TARGET_AMD64, g_CpuCount, binutils_dir, TC_DEBUG_BUILD_STAMP)
 print(">>Binutils compiled")
 
 
-
+"""
 
 
 gcc_build = build.GetGccUrl(menu.DISP_MENU_LATEST)
@@ -110,17 +112,17 @@ build.UnpackSource(TC_DEBUG_DOWNLOAD_PATH + gcc_version, TC_DEBUG_EXTRACT_PATH)
 
 
 
-build.CompileTargetGcc(TC_DEBUG_EXTRACT_PATH + "/gcc_build",  TC_DEBUG_INSTALL_PATH, COMPILE_TARGET_AMD64, g_CpuCount, gcc_dir, build_stamp)
+build.CompileTargetGcc(TC_DEBUG_EXTRACT_PATH + "/gcc_build",  TC_DEBUG_INSTALL_PATH, COMPILE_TARGET_AMD64, g_CpuCount, gcc_dir, TC_DEBUG_BUILD_STAMP)
 print(">>GCC compiled")
 
 
-
+"""
 
 
 
 
 build.CleanupTree(TC_DEBUG_STAMP_PATH)
-build.DeleteNoticeStamp(build_stamp)
+build.DeleteNoticeStamp(TC_DEBUG_BUILD_STAMP)
 
 
 #

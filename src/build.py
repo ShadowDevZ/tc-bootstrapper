@@ -19,7 +19,10 @@ GNU_GPG_KEYRING="https://ftp.gnu.org/gnu/gnu-keyring.gpg"
 
 TIMESTAMP_EMPTY = ""
 
-
+def mkdir_if_not_exists(dir: str) -> None:
+    if (not os.path.exists(dir)):
+        os.mkdir(dir)
+        
 
 def get_files(url: str, allowed_extensions: list=[]) -> list:
     response = requests.get(url)
@@ -175,7 +178,7 @@ def CheckStamp(stamp: str) -> bool:
     f.close()
     return True
 
-def WriteToNoticeStampDir(stamp: str, path: str, ptype: str) -> bool:
+def WriteToNoticeStamp(stamp: str, path: str, ptype: str) -> bool:
     
     if (not CheckStamp(stamp)):
         return False
@@ -244,7 +247,7 @@ def DownloadSource(uri: str, dest: str, stamp: str, dflags: int=0) -> int:
             if (not CreateNoticeStamp(stamp)):
                 return DOWNLOAD_SOURCE_RET_STAMP_FAIL
     
-        if (not WriteToNoticeStampDir(stamp+ ".notice", dest, 'A')):
+        if (not WriteToNoticeStamp(stamp+ ".notice", dest, 'A')):
                 return DOWNLOAD_SOURCE_RET_STAMP_FAIL
 
     return DOWNLOAD_SOURCE_RET_SUCCESS
@@ -290,7 +293,7 @@ def UnpackSource(src: str, dst: str, uflags: int=0) -> bool:
         return False
     
     
-    if (not WriteToNoticeStampDir(dst+ "/.notice", dst + rpath, 'D')):
+    if (not WriteToNoticeStamp(dst+ "/.notice", dst + rpath, 'D')):
             print("Failed to write to the stamp")
             return False
     
@@ -344,7 +347,7 @@ def CompileTargetBinutils(src: str,prefix: str,target: str, nproc: int,tree: str
         print("Failed to check stamp signature")
         return False
     
-    if (not WriteToNoticeStampDir(stamp, src, 'D')):
+    if (not WriteToNoticeStamp(stamp, src, 'D')):
         print("Failed to write a stamp")
         return False
 
@@ -372,7 +375,7 @@ def CompileTargetGcc(src: str,prefix: str,target: str, nproc: int, tree: str, st
         print("Failed to check stamp signature while building GCC")
         return False
     
-    if (not WriteToNoticeStampDir(stamp, src, 'D')):
+    if (not WriteToNoticeStamp(stamp, src, 'D')):
         print("Failed to write a stamp while building GCC")
         return False
     
@@ -404,8 +407,7 @@ def CleanupTree(src: str) -> bool:
 
     
     for ln in f:
-        
-        
+    
         
 
         if ln.startswith('A'):
@@ -422,10 +424,7 @@ def CleanupTree(src: str) -> bool:
                 print(f"Cleaning tree {a[-1]}")
                 shutil.rmtree(a[-1])
        
-        if (not ln.startswith('#')):
-            a = ln.rstrip().split()
-            if (not os.path.exists(a[-1])):
-                f.write(ln)
+
     
     f.close()
     return True
@@ -433,32 +432,47 @@ def CleanupTree(src: str) -> bool:
         
                 
                 
-def DownloadGPGKeychain(remSig: str, downloadPath: str):
+def DownloadGPGKeychain(remSig: str, downloadPath: str, stamp: str):
     #download the keychain
     retVal = DownloadSource(GNU_GPG_KEYRING, downloadPath, TIMESTAMP_EMPTY)
     if (retVal == DOWNLOAD_SOURCE_RET_SRC_EXISTS or retVal == DOWNLOAD_SOURCE_RET_SUCCESS):
+        
+        if (not WriteToNoticeStamp(stamp, downloadPath, 'A')):
+                return False
+        
         return True
+    
     
     return False
 
-def DownloadDetachedSignature(uri: str, downloadPath: str):
+def DownloadDetachedSignature(uri: str, downloadPath: str, stamp: str):
     
     signature = uri + ".sig"
     print(signature)
     retVal = DownloadSource(signature, downloadPath , TIMESTAMP_EMPTY)
     if (retVal == DOWNLOAD_SOURCE_RET_SRC_EXISTS or retVal == DOWNLOAD_SOURCE_RET_SUCCESS):
+        
+        if (not CheckStamp(stamp)):
+            return False
+        else:
+            if (not WriteToNoticeStamp(stamp, downloadPath, 'A')):
+                return False
+        
         return True
     
     return False
 
 import gnupg
 
-def VerifyPGP(signature: str, file: str, gpghome: str, keychain: str):
+def VerifyPGP(signature: str, file: str, gpghome: str, keychain: str, stamp: str):
 
     
     if (not os.path.exists(gpghome)):
         os.makedirs(gpghome, mode=0o700)
-   
+    
+    
+    if (not WriteToNoticeStamp(stamp, gpghome, 'D')):
+            return False
         
     
     if (not os.path.isdir(gpghome)):
