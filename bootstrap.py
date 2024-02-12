@@ -69,7 +69,7 @@ GNU_GPG_KEYRING="https://ftp.gnu.org/gnu/gnu-keyring.gpg"
 
 
 
-g_config = []
+
 class BootStrapper:
    
     
@@ -82,7 +82,7 @@ class BootStrapper:
         self.options = options
         self._lastErrorCode = 0
         self.nproc = 0
-      #  self._config = [None]
+        self._config = []
         self.keyChainPath = keychainPath
         
         
@@ -281,7 +281,7 @@ class BootStrapper:
     
     def _CompileTargetGcc():
         pass
-    def _CompileTargetBU()):
+    def _CompileTargetBU():
         pass
     
     def _ExtractSources():
@@ -309,7 +309,7 @@ class BootStrapper:
         pass
     def OptionsMenu():
         pass
-    def WorkProgress():
+    def WorkReportProgress():
         pass
     # global config instead of locally passed vars
     #example usage: ConfigWrite(CONFIG_CC, "gcc")
@@ -320,31 +320,31 @@ class BootStrapper:
     
     #todo use more efficient approach, eg. binary search
     def ConfigGetEntry(self, var: str):
-        for e in g_config:
-            for x in e:
-                if g_config[x][0] == var:
-                    return g_config[x][1]
+
+        for i in range(len(self._config)):
+            for j in range(i+1):
+                if self._config[j][0] == var:
+                    return self._config[j][1]
         
         return None
             
         
     def ConfigWriteEntry(self, var:str, key):
-        global g_config
+        
         found = False
         val = -1
-        for e in g_config:
-            for x in e:
-                if g_config[x][0] == var:
+        for i in range(len(self._config)):
+            for j in range(i+1):
+                if self._config[j][0] == var:
                     found = True
-                    val = x
+                    val = j
                     
         if (not found):
-            g_config += [[var, key]]
+            self._config += [[var, key]]
         else:
-            g_config[val][1] = key
+            self._config[val][1] = key
 
-    
-    
-    
+
+
     
     
