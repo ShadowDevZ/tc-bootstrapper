@@ -26,6 +26,7 @@ class BootStrapperOptions(IntEnum):
     BSO_FILE_LOG = 1 << 7
     BSOE_INIT_LIB = 1 << 8
     BSOE_OVERWRITE_DOWNLOAD = 1 << 9
+    BSOE_PULL_LATEST = 1 << 10
 class BootStrapperDownloadOpts(IntEnum):
     BSDO_NONE = 0
     BSDO_GCC = 1 << 1
@@ -80,10 +81,12 @@ class BootStrapper:
         self.extractPath = extractPath
         self.stampPath = stampPath
         self.options = options
-        self._lastErrorCode = 0
+        self._lastErrorCode = BSOE.BSOE_SUCCESS
         self.nproc = 0
         self._config = []
         self.keyChainPath = keychainPath
+        #ranked by priority
+        self._filter = [".tar.xz", ".tar.lz", ".tar.gz", ".tar.bz2"]
         
         
     
@@ -151,10 +154,16 @@ class BootStrapper:
         if (err <= len(BSOE)):
             self._lastErrorCode = err
     
-    def GetLastError(self):
+    def GetLastError(self) -> BSOE:
         return self._lastErrorCode
     
     def GetLastErrorAsString(self) -> str:
+        
+        return self.GetErrorAsString(self.GetLastError())
+    
+    def GetErrorAsString(self, err: BSOE) -> str:
+        if (err > len(BSOE)):
+            return "<NULL>"
         _errs = ["Success",
                  "Bad parameter",
                  "I/O fail",
@@ -178,8 +187,7 @@ class BootStrapper:
                  "Function/Feature is not currently supported",
                  "Source file already exists"]
         
-        return _errs[self._lastErrorCode]
-    
+        return _errs[err]
     
     def _GetRemoteFileList(self, url: str, allowedExtension: list=[]) -> list:
         if (not BootStrapper.IsInitialized):
@@ -250,7 +258,7 @@ class BootStrapper:
         
        """ 
     
-    def _DownloadSource(self, url: str, dst: str):
+    def _DownloadSource(self, url: str, dst: str) -> bool:
         if (not self.options & BootStrapperOptions.BSOE_OVERWRITE_DOWNLOAD):
             BootStrapper.SetLastError(self, BSOE.BSOE_SRC_ALR_EXISTS)
             return False
@@ -268,10 +276,43 @@ class BootStrapper:
             BootStrapper.SetLastError(self, BSOE.BSOE_RMT_URL)
             return False
         
+        return True
         #todo stamp here
     
-    def _DownloadSourceGCC(self):
-        pass
+   
+    #vesion is in format 13.2.0 and is catted to the CONFIG_URL_TOOLCHAIN
+    def _DownloadSourceGCC(self, version):
+        if (not self.IsInitialized()):
+            return BSOE.BSOE_LIB_NOT_INIT
+        
+        dirs = self._GetRemoteDirList(CONFIG_URL_TOOLCHAIN)
+        ret = self.GetLastError()
+        if (ret != BSOE.BSOE_SUCCESS):
+            return BSOE.BSOE_RMT_URL
+        if (dirs == []):
+            return BSOE.BSOE_RMT_URL
+        
+        url = ""
+        for i in range(len(dirs)):
+            if (dirs[i][-1] == '/'):
+                dirs[i] = dirs[i][:-1]
+            ve = dirs[i].rsplit('-')
+            if (version == ve[-1]):
+
+                url = dirs[i]
+                
+                
+        gccVersion = url.split('/')[-1]
+        url = url + '/' + gccVersion + self._filter[0]
+        
+        ret = self._DownloadSource(url, self.workDir)
+    
+    #todo stamp
+        if (ret != BSOE.BSOE_SUCCESS):
+            return False
+        else:
+            return True
+        
     
     
     

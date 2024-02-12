@@ -31,7 +31,7 @@ def CutString(stri, substr) -> str:
     
     return stri
 
-
+#gcc_build = build.GetGccUrl()
 build.mkdir_if_not_exists(TC_DEBUG_STAMP_PATH)
 build.CreateNoticeStamp(TC_DEBUG_STAMP_PATH)
 print(">>Downloading keychain")
