@@ -29,17 +29,19 @@ bp.ConfigWriteEntry("CFLAGS_GCC", "--disable-nls --enable-languages=c,c++ --with
 bp.ConfigWriteEntry("BINUTILS_ARCH", "x86_64-elf")
 bp.ConfigWriteEntry("GCC_ARCH", "x86_64-elf")
 
-#assert(bp._DownloadSourceBinutils("2.42") == bootstrap.BSOE.BSOE_SUCCESS)
-#assert(bp.UnpackBinutils() == bootstrap.BSOE.BSOE_SUCCESS)
+assert(bp._DownloadSourceBinutils("2.42") == bootstrap.BSOE.BSOE_SUCCESS)
+assert(bp.UnpackBinutils() == bootstrap.BSOE.BSOE_SUCCESS)
 print("unpack error", str(bp.GetLastError()))
 
-#assert(bp._CompileTargetBU() == bootstrap.BSOE.BSOE_SUCCESS)
+assert(bp._CompileTargetBU() == bootstrap.BSOE.BSOE_SUCCESS)
 
 
-assert(bp._DownloadSourceGCC("13.2.0") == bootstrap.BSOE.BSOE_SUCCESS)
-assert(bp.UnpackGcc() == bootstrap.BSOE.BSOE_SUCCESS)
-assert(bp._CompileTargetGcc() == bootstrap.BSOE.BSOE_SUCCESS)
+#assert(bp._DownloadSourceGCC("13.2.0") == bootstrap.BSOE.BSOE_SUCCESS)
+#assert(bp.UnpackGcc() == bootstrap.BSOE.BSOE_SUCCESS)
+#assert(bp._CompileTargetGcc() == bootstrap.BSOE.BSOE_SUCCESS)
 #bp._print_params()
-if (bp.GetLastError() != bootstrap.BSOE.BSOE_SUCCESS):
-    print("err: ")
-    
+#if (bp.GetLastError() != bootstrap.BSOE.BSOE_SUCCESS):
+#    print("err: ")
+
+bp.Finalize()
+

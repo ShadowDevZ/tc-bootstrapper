@@ -17,6 +17,8 @@ from enum import IntEnum
 
 
 
+
+
 class BootStrapperOptions(IntEnum):
     BSO_VERIFY_PGP = 1 << 1
     BSO_CLEANUP = 1 << 2
@@ -57,6 +59,7 @@ class BSOE(IntEnum):
     BSOE_LIB_ALR_INIT = 19
     BSOE_NOT_IMPLEMENTED = 20
     BSOE_SRC_ALR_EXISTS = 21
+    BSOE_STAMP_FAIL = 22
     
 
 def MkdirIfNotExists(dir: str) -> None:
@@ -90,7 +93,10 @@ class BootStrapper:
         else:
             self.extractPath = workDir
         
-        self.stampPath = stampPath
+        if (stampPath == None):
+            self.stampPath = self.workDir
+        else:
+            self.stampPath = stampPath
         self.options = options
         self._lastErrorCode = BSOE.BSOE_SUCCESS
         self.nproc = 0
@@ -98,6 +104,7 @@ class BootStrapper:
         self.keyChainPath = keychainPath
         #ranked by priority
         self._filter = [".tar.xz", ".tar.lz", ".tar.gz", ".tar.bz2"]
+       
         
         
     
@@ -106,6 +113,7 @@ class BootStrapper:
         MkdirIfNotExists(self.extractPath)
         MkdirIfNotExists(self.workDir)
         MkdirIfNotExists(self.installPath)
+        
         
         
         if (self.options & BootStrapperOptions.BSOE_INIT_LIB):
@@ -158,7 +166,10 @@ class BootStrapper:
       #      return BSOE.BSOE_NOT_IMPLEMENTED
         
         BootStrapper.SetLastError(self, BSOE.BSOE_SUCCESS)
+        if(not self._CreateStamp()):
+            return BSOE.BSOE_STAMP_FAIL
         
+        self._WriteStamp(self.workDir, 'D')
         return BSOE.BSOE_SUCCESS
     
     
@@ -169,6 +180,9 @@ class BootStrapper:
         
         self.options &= ~(BootStrapperOptions.BSOE_INIT_LIB)
         #call cleanup routine here
+        
+        self._ClenupStamp()
+        self._DeleteStamp()
         return BSOE.BSOE_SUCCESS
         
         
@@ -214,7 +228,8 @@ class BootStrapper:
                  "Parameter overflown",
                  "Library has been already intialized",
                  "Function/Feature is not currently supported",
-                 "Source file already exists"]
+                 "Source file already exists",
+                 "Failed to initialize timestamp"]
         
         return _errs[err]
     
@@ -309,6 +324,7 @@ class BootStrapper:
             return BSOE.BSOE_RMT_URL
         
         BootStrapper.SetLastError(self, BSOE.BSOE_SUCCESS)
+        self._WriteStamp(self.extractPath + '/'+dst, 'A')
         return BSOE.BSOE_SUCCESS
         #todo stamp here
     
@@ -466,6 +482,7 @@ class BootStrapper:
        # print(f"make -j{nproc}", self.workDir + bv)
        # print("make install", self.workDir + bv)
         MkdirIfNotExists(self.workDir + "binutils_build")
+        self._WriteStamp(self.workDir + "binutils_build", 'D')
         self._xcall(bucmd, self.workDir + "binutils_build")
         self._xcall(f"make -j{nproc}", self.workDir +"binutils_build")
         self._xcall("make install",self.workDir+ "binutils_build")
@@ -501,15 +518,16 @@ class BootStrapper:
         if (not self.IsInitialized()):
             self.SetLastError(BSOE.BSOE_LIB_NOT_INIT)
             return BSOE.BSOE_LIB_NOT_INIT
-        
+        buver = self.ConfigGetEntry("BU_VERSION")
         dst = self.ConfigGetEntry("BU_DEST_FILE_DOWNLOAD")
-        if (dst == -1):
+        if (dst == -1 or buver == -1):
             self.SetLastError(BSOE.BSOE_INTERNAL)
-            print("kys")
+            
             return BSOE.BSOE_INTERNAL
        
       
         ret = self._UnpackSource(dst)
+        self._WriteStamp(self.extractPath + '/'+buver, 'D')
         self.SetLastError(ret)
         return ret
     
@@ -518,11 +536,13 @@ class BootStrapper:
             return BSOE.BSOE_LIB_NOT_INIT
         
         dst = self.ConfigGetEntry("GCC_DEST_FILE_DOWNLOAD")
-        if (dst == -1):
+        gccver = self.ConfigGetEntry("GCC_VERSION")
+        if (dst == -1 or gccver == -1):
             return BSOE.BSOE_INTERNAL
         
         ret = self._UnpackSource(dst)
-        
+        self._WriteStamp(self.extractPath + '/'+gccver, 'D')
+        self.SetLastError(ret)
         return ret
     
     def _UnpackSource(self, src: str) -> BSOE:
@@ -561,6 +581,7 @@ class BootStrapper:
        
         tar = tarfile.open(src, perms)
         tar.extractall(self.extractPath)
+        
         tar.close()
         
         #timestamp
@@ -569,14 +590,81 @@ class BootStrapper:
         return BSOE.BSOE_SUCCESS
         
     
-    def _WriteStamp():
-        pass
-    def _ClenupStamp():
-        pass
-    def _DeleteStamp():
-        pass
-    def CreateStamp():
-        pass
+    def _WriteStamp(self, path:str, ptype: str) -> bool:
+        if (not self._CheckStamp()):
+            return False
+        f = open(self.stampPath + "/.notice", "a")
+    
+    
+    
+    
+        if (ptype != 'A' and ptype != 'D'):
+            return False;
+    
+   
+    
+        f.write(ptype + ' ' + path + '\n')
+    
+        f.close()
+        return True
+    
+    def _ClenupStamp(self) -> bool:
+        if (not self._CheckStamp()):
+            print("Cleanup failed, stamp doesnt exist")
+            return False
+        f = open(self.stampPath+"/.notice", 'r+')
+    
+
+    
+        for ln in f:
+    
+        
+
+            if ln.startswith('A'):
+                a = ln.rstrip().split()
+           
+                if (os.path.exists(a[-1])):
+                    print(f"Cleaning {a[-1]}")
+                    os.remove(a[-1])
+
+
+            elif ln.startswith('D'):
+                a = ln.rstrip().split()
+                if (os.path.exists(a[-1])):
+                    print(f"Cleaning tree {a[-1]}")
+                    shutil.rmtree(a[-1])
+       
+
+    
+        f.close()
+        return True
+    
+    def _CheckStamp(self) -> bool:
+        if (not os.path.exists(self.stampPath + "/.notice")):
+            return False
+        
+        f= open(self.stampPath + "/.notice", "r")
+        msg = "#!!!This file has been autogenerated and is used as stamp\n"
+        if (f.readline() != msg):
+            print("Not a valid timestamp")
+            f.close()
+            return False
+        f.close()
+        return True
+        
+    def _DeleteStamp(self) -> bool:
+        if (not self._CheckStamp()):
+            return False
+        
+        os.remove(self.stampPath + "/.notice")
+        return True
+    def _CreateStamp(self) -> bool:
+        if (not os.path.exists(self.stampPath) and not os.path.exists(self.stampPath + "/.notice")):
+            return False
+        f = open(f"{self.stampPath}/.notice", "w")
+        f.write("#!!!This file has been autogenerated and is used as stamp\n#DO NOT EDIT MANUALLY\n")
+        f.close()
+        return True
     
     def DownloadMenu():
         pass
