@@ -166,3 +166,5 @@ cython_debug/
 *.todo
 *.test
 downloaded/*
+_bkp/*
+*.bkp
