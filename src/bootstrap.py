@@ -1,6 +1,6 @@
 import subprocess
-from build import GetBinUtilsUrl, get_files, mkdir_if_not_exists
-import menu
+
+#import menu
 import os
 import requests
 from bs4 import BeautifulSoup
@@ -56,6 +56,11 @@ class BSOE(IntEnum):
     BSOE_NOT_IMPLEMENTED = 20
     BSOE_SRC_ALR_EXISTS = 21
     
+
+def MkdirIfNotExists(dir: str) -> None:
+    if (not os.path.exists(dir)):
+        os.mkdir(dir)    
+
 def CheckDir(dir) -> bool:
     if (not os.path.exists(dir) or not os.path.isdir(dir)):
         return False
@@ -78,7 +83,11 @@ class BootStrapper:
         #todo make it more flexible using config so it can be changed later
         self.workDir = workDir
         self.installPath = installPath
-        self.extractPath = extractPath
+        if (extractPath != None):
+            self.extractPath = extractPath
+        else:
+            self.extractPath = workDir
+        
         self.stampPath = stampPath
         self.options = options
         self._lastErrorCode = BSOE.BSOE_SUCCESS
@@ -92,34 +101,48 @@ class BootStrapper:
     
     def Inititialize(self) -> BSOE:
         
-       
+        
         
         
         if (self.options & BootStrapperOptions.BSOE_INIT_LIB):
+            BootStrapper.SetLastError(self, BSOE.BSOE_LIB_ALR_INIT)
             return BSOE.BSOE_LIB_ALR_INIT
         
         if (not CheckDir(self.workDir) or not CheckDir(self.installPath)):
+            BootStrapper.SetLastError(self, BSOE.BSOE_NOFILE)
             return BSOE.BSOE_NOFILE
-            
-        if (self.nproc <= 0 or self.nproc > multiprocessing.cpu_count()):
+           
+        _nproc = int(self.ConfigGetEntry("NPROC")) 
+        
+        if (_nproc > multiprocessing.cpu_count()):
+            BootStrapper.SetLastError(self, BSOE.BSOE_OVERFLOW)
             return BSOE.BSOE_OVERFLOW
+        elif (_nproc == -1):
+            self.nproc = 1
+        
+        else:
+            self.nproc = _nproc
+            
         
         
         if (self.stampPath == None):
             self.stampPath = self.workDir
         elif (not CheckDir(self.stampPath)):
+            BootStrapper.SetLastError(self, BSOE.BSOE_NOFILE)
             return BSOE.BSOE_NOFILE
         
         if (self.extractPath == None):
             self.extractPath = self.workDir
         elif (not CheckDir(self.extractPath)):
+            BootStrapper.SetLastError(self, BSOE.BSOE_NOFILE)
             return BSOE.BSOE_NOFILE
         
         if (self.keyChainPath == None):
             self.keyChainPath = self.workDir + "/keychain"
-            mkdir_if_not_exists(self.keyChainPath)
+            MkdirIfNotExists(self.keyChainPath)
         
         elif (not CheckDir(self.keyChainPath)):
+            BootStrapper.SetLastError(self, BSOE.BSOE_NOFILE)
             return BSOE.BSOE_NOFILE
                 
         
@@ -129,7 +152,7 @@ class BootStrapper:
         #temporary, todo later
       #  if (self.options != BootStrapperOptions.BSOE_INIT_LIB):
       #      return BSOE.BSOE_NOT_IMPLEMENTED
-        
+        BootStrapper.SetLastError(self, BSOE.BSOE_SUCCESS)
         
         return BSOE.BSOE_SUCCESS
     
@@ -219,7 +242,17 @@ class BootStrapper:
         else:
             BootStrapper.SetLastError(self, BSOE.BSOE_UNR_SRC)
             return [response.status_code] 
-        
+    
+    def _print_params(self):
+        print("\n\n")
+        print("ext", self.extractPath)
+        print("wrk", self.workDir)
+        print("inst", self.installPath)
+        print("opt", self.options)
+        print("cfg", self._config)
+        print("err", self._lastErrorCode)
+        print("estr", self.GetLastErrorAsString())
+        print("\n\n")
     
     def _GetRemoteDirList(self, url: str) -> list:
         
@@ -259,14 +292,16 @@ class BootStrapper:
        """ 
     
     def _DownloadSource(self, url: str, dst: str) -> bool:
-        if (not self.options & BootStrapperOptions.BSOE_OVERWRITE_DOWNLOAD):
+        if (os.path.exists(dst) and (not self.options & BootStrapperOptions.BSOE_OVERWRITE_DOWNLOAD)):
             BootStrapper.SetLastError(self, BSOE.BSOE_SRC_ALR_EXISTS)
             return False
         
+       
         try:
             urllib.request.urlopen(url, timeout=5)
         except urllib.error.URLError as e:
             BootStrapper.SetLastError(self, BSOE.BSOE_RMT_URL)
+           
             return False
         
         try:
@@ -274,6 +309,7 @@ class BootStrapper:
             urllib.request.urlretrieve(url, dst)
         except urllib.error.URLError as e:
             BootStrapper.SetLastError(self, BSOE.BSOE_RMT_URL)
+           
             return False
         
         return True
@@ -282,11 +318,13 @@ class BootStrapper:
    
     #vesion is in format 13.2.0 and is catted to the CONFIG_URL_TOOLCHAIN
     def _DownloadSourceGCC(self, version):
+        print(self.options)
         if (not self.IsInitialized()):
             return BSOE.BSOE_LIB_NOT_INIT
-        
+          
         dirs = self._GetRemoteDirList(CONFIG_URL_TOOLCHAIN)
         ret = self.GetLastError()
+        
         if (ret != BSOE.BSOE_SUCCESS):
             return BSOE.BSOE_RMT_URL
         if (dirs == []):
@@ -301,16 +339,18 @@ class BootStrapper:
 
                 url = dirs[i]
                 
-                
+        
         gccVersion = url.split('/')[-1]
         url = url + '/' + gccVersion + self._filter[0]
-        
-        ret = self._DownloadSource(url, self.workDir)
     
+        ret = self._DownloadSource(url, self.workDir + gccVersion + self._filter[0])
+      
     #todo stamp
         if (ret != BSOE.BSOE_SUCCESS):
             return False
         else:
+            self.ConfigWriteEntry("GCC_DEST_FILE_DOWNLOAD", self.workDir + gccVersion + self._filter[0])
+            self.ConfigWriteEntry("GCC_VERSION", gccVersion)
             return True
         
     
@@ -334,8 +374,55 @@ class BootStrapper:
     def _xcall():
         pass
     
-    def UnpackSource():
-        pass
+    def UnpackGcc(self) -> BSOE:
+        if (not self.IsInitialized()):
+            return BSOE.BSOE_LIB_NOT_INIT
+        
+        dst = self.ConfigGetEntry("GCC_DEST_FILE_DOWNLOAD")
+        if (dst == -1):
+            return BSOE.BSOE_INTERNAL
+        
+        ret = self._UnpackSource(dst)
+        
+        return ret
+    
+    def _UnpackSource(self, src: str) -> BSOE:
+        if (not self.IsInitialized()):
+            return BSOE.BSOE_LIB_NOT_INIT
+        if (not os.path.exists(self.extractPath)):
+            return BSOE.BSOE_NOFILE
+        if (not os.path.exists(src)):
+            return BSOE.BSOE_NOFILE
+        
+        perms = "r:"
+        rpath = src.split('/')[-1]
+        
+        #strip extension from path
+        idx = rpath.find(".tar.")
+        if (idx != -1):
+            rpath = rpath[:idx]
+        else:
+            return BSOE.BSOE_NOFILE
+        
+        if (not self.options & BootStrapperOptions.BSO_OVERWRITE):
+            if (os.path.exists(self.extractPath + rpath)):
+                return BSOE.BSOE_SRC_ALR_EXISTS
+        
+        for ext in self._filter:
+            _ext = ext.split('.')[-1]
+            if '.' + _ext == pathlib.Path(src).suffix.lower():
+                perms += ext.split('.')[-1]
+                break
+       
+        tar = tarfile.open(src, perms)
+        tar.extractall(self.extractPath)
+        tar.close()
+        
+        #timestamp
+        
+        
+        return BSOE.BSOE_SUCCESS
+        
     
     def _WriteStamp():
         pass
@@ -367,7 +454,7 @@ class BootStrapper:
                 if self._config[j][0] == var:
                     return self._config[j][1]
         
-        return None
+        return -1
             
         
     def ConfigWriteEntry(self, var:str, key):

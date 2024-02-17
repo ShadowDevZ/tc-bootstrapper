@@ -1,5 +1,5 @@
 import subprocess
-import menu
+#import menu
 import os
 import requests
 from bs4 import BeautifulSoup
