@@ -163,6 +163,7 @@ class BootStrapper:
             return BSOE.BSOE_LIB_NOT_INIT
         
         self.options &= ~(BootStrapperOptions.BSOE_INIT_LIB)
+        #call cleanup routine here
         return BSOE.BSOE_SUCCESS
         
         
@@ -349,7 +350,7 @@ class BootStrapper:
             return BSOE.BSOE_LIB_NOT_INIT
           
         files = self._GetRemoteFileList(CONFIG_URL_BINUTILS)
-       # print(files)
+    
         ret = self.GetLastError()
          
         if (ret != BSOE.BSOE_SUCCESS):
@@ -392,9 +393,6 @@ class BootStrapper:
     def _CompileTargetGcc():
         pass
     def _CompileTargetBU():
-        pass
-    
-    def _ExtractSources():
         pass
     
     
