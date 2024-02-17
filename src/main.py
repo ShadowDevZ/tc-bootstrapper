@@ -26,8 +26,10 @@ bootstrap.MkdirIfNotExists(TC_DEBUG_EXTRACT_PATH)
 bootstrap.MkdirIfNotExists(TC_DEBUG_INSTALL_PATH)
 
 bp.ConfigWriteEntry("NPROC", 4)
-bp._DownloadSourceGCC("13.2.0")
-bp.UnpackGcc()
+bp._DownloadSourceBinutils("2.42")
+bp.UnpackBinutils()
+#bp._DownloadSourceGCC("13.2.0")
+#bp.UnpackGcc()
 #bp._print_params()
 if (bp.GetLastError() != bootstrap.BSOE.BSOE_SUCCESS):
     print("err: ")

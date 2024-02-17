@@ -212,7 +212,7 @@ class BootStrapper:
         
         return _errs[err]
     
-    def _GetRemoteFileList(self, url: str, allowedExtension: list=[]) -> list:
+    def _GetRemoteFileList(self, url: str) -> list:
         if (not BootStrapper.IsInitialized):
             BootStrapper.SetLastError(self, BSOE.BSOE_LIB_NOT_INIT)
             return []
@@ -230,9 +230,9 @@ class BootStrapper:
                 
                 fullUrl = url + '/' + href
                 
-                if allowedExtension is not []:
+                if self._filter is not []:
                     
-                    for ext in allowedExtension:
+                    for ext in self._filter:
                       if fullUrl.lower().endswith(ext):
                           files.append(fullUrl)
                 else:
@@ -279,17 +279,7 @@ class BootStrapper:
         else:
             BootStrapper.SetLastError(self, BSOE.BSOE_UNR_SRC)
             return [response.status_code]
-    """
-    def MenuGetBinUtils(self):
-        
-        files = get_files(CONFIG_URL_BINUTILS, [".tar.xz"])
-        if (BootStrapper.GetLastError(self) != BSOE.BSOE_SUCCESS):
-            #todo show on menu
-            print("dbg url fail:", str(files))
-            pass
-        #show menu here
-        
-       """ 
+
     
     def _DownloadSource(self, url: str, dst: str) -> bool:
         if (os.path.exists(dst) and (not self.options & BootStrapperOptions.BSOE_OVERWRITE_DOWNLOAD)):
@@ -318,7 +308,7 @@ class BootStrapper:
    
     #vesion is in format 13.2.0 and is catted to the CONFIG_URL_TOOLCHAIN
     def _DownloadSourceGCC(self, version):
-        print(self.options)
+       
         if (not self.IsInitialized()):
             return BSOE.BSOE_LIB_NOT_INIT
           
@@ -353,8 +343,47 @@ class BootStrapper:
             self.ConfigWriteEntry("GCC_VERSION", gccVersion)
             return True
         
+    def _DownloadSourceBinutils(self, version):
+       
+        if (not self.IsInitialized()):
+            return BSOE.BSOE_LIB_NOT_INIT
+          
+        files = self._GetRemoteFileList(CONFIG_URL_BINUTILS)
+       # print(files)
+        ret = self.GetLastError()
+         
+        if (ret != BSOE.BSOE_SUCCESS):
+            return BSOE.BSOE_RMT_URL
+        if (files == []):
+            return BSOE.BSOE_RMT_URL
+        
+        url = CONFIG_URL_BINUTILS + '/' + 'binutils-' + version + self._filter[0]
+        if (not url in files):
+            return BSOE.BSOE_NOFILE
+        
+        buVersion = url.split('/')[-1]
+         
+        #strip extension from path
+        idx = buVersion.find(".tar.")
+        if (idx != -1):
+            buVersion = buVersion[:idx]
+        else:
+            return BSOE.BSOE_NOFILE
+        
+        
+        ret = self._DownloadSource(url, self.workDir + buVersion + self._filter[0])
+        
+       
+        
     
-    
+      
+    #todo stamp
+        if (ret != BSOE.BSOE_SUCCESS):
+            return False
+        else:
+            self.ConfigWriteEntry("BU_DEST_FILE_DOWNLOAD",self.workDir + buVersion + self._filter[0])
+            self.ConfigWriteEntry("BU_VERSION", buVersion)
+            return True
     
     def CompileTarget(self, arch, ccOptions) -> BSOE:
         return BSOE.BSOE_ACCESS_DENIED
@@ -373,6 +402,18 @@ class BootStrapper:
         pass
     def _xcall():
         pass
+    
+    def UnpackBinutils(self) -> BSOE:
+        if (not self.IsInitialized()):
+            return BSOE.BSOE_LIB_NOT_INIT
+        
+        dst = self.ConfigGetEntry("BU_DEST_FILE_DOWNLOAD")
+        if (dst == -1):
+            return BSOE.BSOE_INTERNAL
+      
+        ret = self._UnpackSource(dst)
+        
+        return ret
     
     def UnpackGcc(self) -> BSOE:
         if (not self.IsInitialized()):
