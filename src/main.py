@@ -11,7 +11,7 @@ TC_DEBUG_BUILD_STAMP = TC_DEBUG_EXTRACT_PATH + ".notice"
 
 
 
-bp = bootstrap.BootStrapper(TC_DEBUG_DOWNLOAD_PATH, TC_DEBUG_INSTALL_PATH, TC_DEBUG_EXTRACT_PATH)
+bp = bootstrap.BootStrapper(TC_DEBUG_EXTRACT_PATH, TC_DEBUG_INSTALL_PATH, TC_DEBUG_EXTRACT_PATH)
 bp.Inititialize()
 
 
@@ -21,15 +21,24 @@ else:
     print("init success")    
 
 
-bootstrap.MkdirIfNotExists(TC_DEBUG_DOWNLOAD_PATH)
-bootstrap.MkdirIfNotExists(TC_DEBUG_EXTRACT_PATH)
-bootstrap.MkdirIfNotExists(TC_DEBUG_INSTALL_PATH)
 
-bp.ConfigWriteEntry("NPROC", 4)
-bp._DownloadSourceBinutils("2.42")
-bp.UnpackBinutils()
-#bp._DownloadSourceGCC("13.2.0")
-#bp.UnpackGcc()
+
+bp.ConfigWriteEntry("NPROC", 8)
+bp.ConfigWriteEntry("CFLAGS_BINUTILS", "--with-sysroot --disable-nls -disable-werror")
+bp.ConfigWriteEntry("CFLAGS_GCC", "--disable-nls --enable-languages=c,c++ --without-headers")
+bp.ConfigWriteEntry("BINUTILS_ARCH", "x86_64-elf")
+bp.ConfigWriteEntry("GCC_ARCH", "x86_64-elf")
+
+#assert(bp._DownloadSourceBinutils("2.42") == bootstrap.BSOE.BSOE_SUCCESS)
+#assert(bp.UnpackBinutils() == bootstrap.BSOE.BSOE_SUCCESS)
+print("unpack error", str(bp.GetLastError()))
+
+#assert(bp._CompileTargetBU() == bootstrap.BSOE.BSOE_SUCCESS)
+
+
+assert(bp._DownloadSourceGCC("13.2.0") == bootstrap.BSOE.BSOE_SUCCESS)
+assert(bp.UnpackGcc() == bootstrap.BSOE.BSOE_SUCCESS)
+assert(bp._CompileTargetGcc() == bootstrap.BSOE.BSOE_SUCCESS)
 #bp._print_params()
 if (bp.GetLastError() != bootstrap.BSOE.BSOE_SUCCESS):
     print("err: ")

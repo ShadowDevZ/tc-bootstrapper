@@ -15,6 +15,8 @@ from subprocess import call
 
 from enum import IntEnum
 
+
+
 class BootStrapperOptions(IntEnum):
     BSO_VERIFY_PGP = 1 << 1
     BSO_CLEANUP = 1 << 2
@@ -101,7 +103,9 @@ class BootStrapper:
     
     def Inititialize(self) -> BSOE:
         
-        
+        MkdirIfNotExists(self.extractPath)
+        MkdirIfNotExists(self.workDir)
+        MkdirIfNotExists(self.installPath)
         
         
         if (self.options & BootStrapperOptions.BSOE_INIT_LIB):
@@ -152,6 +156,7 @@ class BootStrapper:
         #temporary, todo later
       #  if (self.options != BootStrapperOptions.BSOE_INIT_LIB):
       #      return BSOE.BSOE_NOT_IMPLEMENTED
+        
         BootStrapper.SetLastError(self, BSOE.BSOE_SUCCESS)
         
         return BSOE.BSOE_SUCCESS
@@ -282,10 +287,10 @@ class BootStrapper:
             return [response.status_code]
 
     
-    def _DownloadSource(self, url: str, dst: str) -> bool:
+    def _DownloadSource(self, url: str, dst: str) -> BSOE:
         if (os.path.exists(dst) and (not self.options & BootStrapperOptions.BSOE_OVERWRITE_DOWNLOAD)):
             BootStrapper.SetLastError(self, BSOE.BSOE_SRC_ALR_EXISTS)
-            return False
+            return BSOE.BSOE_SUCCESS
         
        
         try:
@@ -293,7 +298,7 @@ class BootStrapper:
         except urllib.error.URLError as e:
             BootStrapper.SetLastError(self, BSOE.BSOE_RMT_URL)
            
-            return False
+            return BSOE.BSOE_RMT_URL
         
         try:
             #add report
@@ -301,14 +306,15 @@ class BootStrapper:
         except urllib.error.URLError as e:
             BootStrapper.SetLastError(self, BSOE.BSOE_RMT_URL)
            
-            return False
+            return BSOE.BSOE_RMT_URL
         
-        return True
+        BootStrapper.SetLastError(self, BSOE.BSOE_SUCCESS)
+        return BSOE.BSOE_SUCCESS
         #todo stamp here
     
    
     #vesion is in format 13.2.0 and is catted to the CONFIG_URL_TOOLCHAIN
-    def _DownloadSourceGCC(self, version):
+    def _DownloadSourceGCC(self, version) -> BSOE:
        
         if (not self.IsInitialized()):
             return BSOE.BSOE_LIB_NOT_INIT
@@ -338,15 +344,16 @@ class BootStrapper:
       
     #todo stamp
         if (ret != BSOE.BSOE_SUCCESS):
-            return False
+            return ret
         else:
             self.ConfigWriteEntry("GCC_DEST_FILE_DOWNLOAD", self.workDir + gccVersion + self._filter[0])
             self.ConfigWriteEntry("GCC_VERSION", gccVersion)
-            return True
+            return BSOE.BSOE_SUCCESS
         
-    def _DownloadSourceBinutils(self, version):
+    def _DownloadSourceBinutils(self, version) -> BSOE:
        
         if (not self.IsInitialized()):
+            self.SetLastError(BSOE.BSOE_LIB_NOT_INIT)
             return BSOE.BSOE_LIB_NOT_INIT
           
         files = self._GetRemoteFileList(CONFIG_URL_BINUTILS)
@@ -354,12 +361,15 @@ class BootStrapper:
         ret = self.GetLastError()
          
         if (ret != BSOE.BSOE_SUCCESS):
+            self.SetLastError(BSOE.BSOE_RMT_URL)
             return BSOE.BSOE_RMT_URL
         if (files == []):
+            self.SetLastError(BSOE.BSOE_RMT_URL)
             return BSOE.BSOE_RMT_URL
         
         url = CONFIG_URL_BINUTILS + '/' + 'binutils-' + version + self._filter[0]
         if (not url in files):
+            self.SetLastError(BSOE.BSOE_NOFILE)
             return BSOE.BSOE_NOFILE
         
         buVersion = url.split('/')[-1]
@@ -369,48 +379,138 @@ class BootStrapper:
         if (idx != -1):
             buVersion = buVersion[:idx]
         else:
+            self.SetLastError(BSOE.BSOE_NOFILE)
             return BSOE.BSOE_NOFILE
         
         
         ret = self._DownloadSource(url, self.workDir + buVersion + self._filter[0])
         
-       
+        
         
     
-      
+        
     #todo stamp
         if (ret != BSOE.BSOE_SUCCESS):
-            return False
+            return ret
         else:
             self.ConfigWriteEntry("BU_DEST_FILE_DOWNLOAD",self.workDir + buVersion + self._filter[0])
             self.ConfigWriteEntry("BU_VERSION", buVersion)
-            return True
+            self.SetLastError(BSOE.BSOE_SUCCESS)
+            return BSOE.BSOE_SUCCESS
     
     def CompileTarget(self, arch, ccOptions) -> BSOE:
         return BSOE.BSOE_ACCESS_DENIED
         pass
     
-    def _CompileTargetGcc():
-        pass
-    def _CompileTargetBU():
-        pass
+    def _CompileTargetGcc(self) -> BSOE:
+        if (not self.IsInitialized()):
+            return BSOE.BSOE_LIB_NOT_INIT
     
+    #check stamp
+        target = self.ConfigGetEntry("GCC_ARCH")
+        if (target == -1):
+            return BSOE.BSOE_BAD_PARAM
+      
+        if (target == -1):
+            return BSOE.BSOE_BAD_PARAM
+        bv = self.ConfigGetEntry("GCC_VERSION")
+        if (target == -1):
+            return BSOE.BSOE_BAD_PARAM
+        cf = self.ConfigGetEntry("CFLAGS_GCC")
+        if (target == -1):
+            return BSOE.BSOE_BAD_PARAM
+        nproc = self.ConfigGetEntry("NPROC")
+        if (target == -1):
+            return BSOE.BSOE_BAD_PARAM
+    
+        gcccmd = f"../{bv}/configure --target={target} --prefix={self.installPath} {cf}"
+        print(gcccmd)
+       # print(bucmd, self.workDir + bv)
+       # print(f"make -j{nproc}", self.workDir + bv)
+       # print("make install", self.workDir + bv)
+        MkdirIfNotExists(self.workDir + "gcc_build")
+        self._xcall(gcccmd, self.workDir + "gcc_build")
+        self._xcall(f"make all-gcc -j{nproc} && make all-target-libgcc -j{nproc}", self.workDir +"gcc_build")
+        self._xcall("make install-gcc && make install-target-libgcc",self.workDir+ "gcc_build")
+        
+        return BSOE.BSOE_SUCCESS
+    
+    
+    def _CompileTargetBU(self) -> BSOE:
+        if (not self.IsInitialized()):
+            return BSOE.BSOE_LIB_NOT_INIT
+        
+        
+        
+    
+    #check stamp
+        target = self.ConfigGetEntry("BINUTILS_ARCH")
+        if (target == -1):
+            return BSOE.BSOE_BAD_PARAM
+      
+        if (target == -1):
+            return BSOE.BSOE_BAD_PARAM
+        bv = self.ConfigGetEntry("BU_VERSION")
+        if (target == -1):
+            return BSOE.BSOE_BAD_PARAM
+        cf = self.ConfigGetEntry("CFLAGS_BINUTILS")
+        if (target == -1):
+            return BSOE.BSOE_BAD_PARAM
+        nproc = self.ConfigGetEntry("NPROC")
+        if (target == -1):
+            return BSOE.BSOE_BAD_PARAM
+    
+        bucmd = f"../{bv}/configure --target={target} --prefix={self.installPath} {cf}"
+     
+       # print(bucmd, self.workDir + bv)
+       # print(f"make -j{nproc}", self.workDir + bv)
+       # print("make install", self.workDir + bv)
+        MkdirIfNotExists(self.workDir + "binutils_build")
+        self._xcall(bucmd, self.workDir + "binutils_build")
+        self._xcall(f"make -j{nproc}", self.workDir +"binutils_build")
+        self._xcall("make install",self.workDir+ "binutils_build")
+        
+        return BSOE.BSOE_SUCCESS
     
     def VerifyPGP():
         pass
-    def _xcall():
-        pass
+    def _xcall(self, cmd: str, wd: str) -> int:
+        if (not self.IsInitialized()):
+            return -1
+        envi = os.environ.copy()
+        envi["PATH"] = f"{self.installPath}/bin:{envi['PATH']}"
+        ret = subprocess.Popen(cmd,env=envi, shell=True,cwd=wd, stderr=subprocess.STDOUT, stdout=subprocess.PIPE, encoding='utf-8', universal_newlines=True)
+
+        while True:
+            ln = ret.stdout.readline()
+            
+            if not ln:
+                break
+            print(ln, end='')
+            
+        exitCode = ret.wait()
+        
+        if (exitCode != 0):
+            self.SetLastError(BSOE.BSOE_XCALL_FAIL)
+            return exitCode
+        
+        self.SetLastError(BSOE.BSOE_SUCCESS)
+        return 0
     
     def UnpackBinutils(self) -> BSOE:
         if (not self.IsInitialized()):
+            self.SetLastError(BSOE.BSOE_LIB_NOT_INIT)
             return BSOE.BSOE_LIB_NOT_INIT
         
         dst = self.ConfigGetEntry("BU_DEST_FILE_DOWNLOAD")
         if (dst == -1):
+            self.SetLastError(BSOE.BSOE_INTERNAL)
+            print("kys")
             return BSOE.BSOE_INTERNAL
+       
       
         ret = self._UnpackSource(dst)
-        
+        self.SetLastError(ret)
         return ret
     
     def UnpackGcc(self) -> BSOE:
@@ -427,10 +527,14 @@ class BootStrapper:
     
     def _UnpackSource(self, src: str) -> BSOE:
         if (not self.IsInitialized()):
+            self.SetLastError(BSOE.BSOE_LIB_NOT_INIT)
             return BSOE.BSOE_LIB_NOT_INIT
+        
         if (not os.path.exists(self.extractPath)):
+            self.SetLastError(BSOE.BSOE_NOFILE)
             return BSOE.BSOE_NOFILE
         if (not os.path.exists(src)):
+            self.SetLastError(BSOE.BSOE_LIB_NOT_INIT)
             return BSOE.BSOE_NOFILE
         
         perms = "r:"
@@ -441,10 +545,12 @@ class BootStrapper:
         if (idx != -1):
             rpath = rpath[:idx]
         else:
+            self.SetLastError(BSOE.BSOE_LIB_NOT_INIT)
             return BSOE.BSOE_NOFILE
         
         if (not self.options & BootStrapperOptions.BSO_OVERWRITE):
             if (os.path.exists(self.extractPath + rpath)):
+                self.SetLastError(BSOE.BSOE_LIB_NOT_INIT)
                 return BSOE.BSOE_SRC_ALR_EXISTS
         
         for ext in self._filter:
