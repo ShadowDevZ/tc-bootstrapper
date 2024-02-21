@@ -27,8 +27,10 @@ class BootStrapperOptions(IntEnum):
     BSO_OUTPUT_VERBOSE = 1 << 5
     BSO_FILE_LOG = 1 << 6
     BSOE_INIT_LIB = 1 << 7
-   
+    BSOE_OVERWRITE_ALL = 1 << 9
     BSOE_PULL_LATEST = 1 << 10
+    BSOE_SUPPRESS = 1 << 11
+    BSOE_NO_INIT = 1 << 12
 class BootStrapperDownloadOpts(IntEnum):
     BSDO_NONE = 0
     BSDO_GCC = 1 << 1
@@ -89,31 +91,60 @@ GNU_GPG_KEYRING="https://ftp.gnu.org/gnu/gnu-keyring.gpg"
 class BootStrapper:
    
     
-    def __init__(self, workDir, installPath, extractPath="", stampPath="", options=0, keychainPath="") -> None:
+    def __init__(self, workDir, installPath, extractPath="", stampPath="", options=0, keychainPath="", downloadCallback=None) -> None:
         #todo make it more flexible using config so it can be changed later
+        
+         #ranked by priority
+        self._filter = [".tar.xz", ".tar.lz", ".tar.gz", ".tar.bz2"]
+        
+        if (options & BootStrapperOptions.BSOE_NO_INIT):
+            
+            return
+        
+        
         self.workDir = workDir
+        
+        if (self.workDir[-1] != '/'):
+            self.workDir += '/'
+        
         self.installPath = installPath
+        if (self.installPath[-1] != '/'):
+            self.installPath += '/'
+            
         if (extractPath != None):
             self.extractPath = extractPath
         else:
             self.extractPath = workDir
         
+        if (self.extractPath[-1] != '/'):
+            self.extractPath += '/'
+        
+        
         if (stampPath == None):
             self.stampPath = self.workDir
         else:
             self.stampPath = stampPath
+            
+        
+            
         self.options = options
         self._lastErrorCode = BSOE.BSOE_SUCCESS
         self.nproc = 0
         self._config = []
         self.keyChainPath = keychainPath
-        #ranked by priority
-        self._filter = [".tar.xz", ".tar.lz", ".tar.gz", ".tar.bz2"]
+        self._lastUriDownloaded = ""
+        self._lastUriPathLocal = ""
+        self._downloadCallback = None
+        if (downloadCallback != None):
+            self._downloadCallback = downloadCallback
+       
        
         
         
     
     def Inititialize(self) -> BSOE:
+        if (self.options & BootStrapperOptions.BSOE_NO_INIT):
+            return BSOE.BSOE_SUCCESS
         
         MkdirIfNotExists(self.extractPath)
         MkdirIfNotExists(self.workDir)
@@ -245,9 +276,9 @@ class BootStrapper:
         return _errs[err]
     
     def _GetRemoteFileList(self, url: str) -> list:
-        if (not BootStrapper.IsInitialized):
-            BootStrapper.SetLastError(self, BSOE.BSOE_LIB_NOT_INIT)
-            return []
+        #if (not BootStrapper.IsInitialized):
+          #  BootStrapper.SetLastError(self, BSOE.BSOE_LIB_NOT_INIT)
+           # return []
         
         response = requests.get(url)
         if (url[-1] == "/"):
@@ -288,9 +319,9 @@ class BootStrapper:
     
     def _GetRemoteDirList(self, url: str) -> list:
         
-        if (not BootStrapper.IsInitialized):
-            BootStrapper.SetLastError(self, BSOE.BSOE_LIB_NOT_INIT)
-            return []
+       # if (not BootStrapper.IsInitialized):
+        #    BootStrapper.SetLastError(self, BSOE.BSOE_LIB_NOT_INIT)
+        #    return []
         
         
         response = requests.get(url)
@@ -314,7 +345,7 @@ class BootStrapper:
 
     
     def _DownloadSource(self, url: str, dst: str, autoStamp=True, overwrite=False) -> BSOE:
-        if (os.path.exists(dst) and overwrite == False):
+        if (os.path.exists(dst) and overwrite == False and (not self.options & BootStrapperOptions.BSOE_OVERWRITE_ALL)):
             BootStrapper.SetLastError(self, BSOE.BSOE_SRC_ALR_EXISTS)
             return BSOE.BSOE_SRC_ALR_EXISTS
         
@@ -328,15 +359,21 @@ class BootStrapper:
         
         try:
             #add report
-            urllib.request.urlretrieve(url, dst)
+            self._lastUriDownloaded = url
+            self._lastUriPathLocal = dst
+            urllib.request.urlretrieve(url, dst, reporthook=self._urllib_cb)
         except urllib.error.URLError as e:
             BootStrapper.SetLastError(self, BSOE.BSOE_RMT_URL)
            
             return BSOE.BSOE_RMT_URL
         
-        BootStrapper.SetLastError(self, BSOE.BSOE_SUCCESS)
+        
         if (autoStamp):
             self._WriteStamp(self.extractPath + '/'+dst, 'A')
+
+        
+        
+        BootStrapper.SetLastError(self, BSOE.BSOE_SUCCESS)
         return BSOE.BSOE_SUCCESS
         #todo stamp here
     
@@ -383,7 +420,14 @@ class BootStrapper:
             self.ConfigWriteEntry("GCC_VERSION", gccVersion)
             self.ConfigWriteEntry("GCC_SIGNATURE", localPath + ".sig")
             return BSOE.BSOE_SUCCESS
-        
+    
+    
+    
+    def _urllib_cb(self, block_num: int, block_size: int, total_size: int):
+        if (self._downloadCallback != None):
+            self._downloadCallback(self._lastUriDownloaded, self._lastUriPathLocal, block_num, block_size, total_size)
+    
+    
     def _DownloadSourceBinutils(self, version) -> BSOE:
        
         if (not self.IsInitialized()):
@@ -479,6 +523,25 @@ class BootStrapper:
         
         return True
         
+    def DownloadGCC(self, ver: str) -> bool:
+   
+        if (not self._DownloadSourceGCC(ver) == BSOE.BSOE_SUCCESS):
+            return False
+        if (self.options & BootStrapperOptions.BSO_VERIFY_PGP):
+           
+            if (self.VerifySignature(BootStrapperObject.BSOBJ_GCC) != True):
+                return False
+       
+        if (self.UnpackGcc() != BSOE.BSOE_SUCCESS):
+            return False
+      
+        
+        if (self._CompileTargetGcc() != BSOE.BSOE_SUCCESS):
+            return False
+        
+        return True
+            
+    
     def VerifySignature(self, bd: BootStrapperObject) ->bool:
         if (not self.IsInitialized()):
             return False
@@ -610,12 +673,13 @@ class BootStrapper:
         envi["PATH"] = f"{self.installPath}/bin:{envi['PATH']}"
         ret = subprocess.Popen(cmd,env=envi, shell=True,cwd=wd, stderr=subprocess.STDOUT, stdout=subprocess.PIPE, encoding='utf-8', universal_newlines=True)
 
-        while True:
-            ln = ret.stdout.readline()
+        if (not (self.options & BootStrapperOptions.BSOE_SUPPRESS)):
+            while True:
+                ln = ret.stdout.readline()
             
-            if not ln:
-                break
-            print(ln, end='')
+                if not ln:
+                    break
+                print(ln, end='')
             
         exitCode = ret.wait()
         
@@ -680,7 +744,7 @@ class BootStrapper:
             self.SetLastError(BSOE.BSOE_LIB_NOT_INIT)
             return BSOE.BSOE_NOFILE
         
-        if (overwrite == False):
+        if (overwrite == False and (not self.options & BootStrapperOptions.BSOE_OVERWRITE_ALL)):
             if (os.path.exists(self.extractPath + rpath)):
                 self.SetLastError(BSOE.BSOE_LIB_NOT_INIT)
                 return BSOE.BSOE_SRC_ALR_EXISTS
