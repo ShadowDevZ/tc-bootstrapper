@@ -11,7 +11,7 @@ TC_DEBUG_BUILD_STAMP = TC_DEBUG_EXTRACT_PATH + ".notice"
 
 
 
-bp = bootstrap.BootStrapper(TC_DEBUG_EXTRACT_PATH, TC_DEBUG_INSTALL_PATH, TC_DEBUG_EXTRACT_PATH)
+bp = bootstrap.BootStrapper(TC_DEBUG_EXTRACT_PATH, TC_DEBUG_INSTALL_PATH, TC_DEBUG_EXTRACT_PATH, options=bootstrap.BootStrapperOptions.BSO_CLEANUP | bootstrap.BootStrapperOptions.BSO_VERIFY_PGP)
 bp.Inititialize()
 
 
@@ -29,12 +29,14 @@ bp.ConfigWriteEntry("CFLAGS_GCC", "--disable-nls --enable-languages=c,c++ --with
 bp.ConfigWriteEntry("BINUTILS_ARCH", "x86_64-elf")
 bp.ConfigWriteEntry("GCC_ARCH", "x86_64-elf")
 
-assert(bp._DownloadSourceBinutils("2.42") == bootstrap.BSOE.BSOE_SUCCESS)
-assert(bp.UnpackBinutils() == bootstrap.BSOE.BSOE_SUCCESS)
-print("unpack error", str(bp.GetLastError()))
+#assert(bp._DownloadSourceBinutils("2.42") == bootstrap.BSOE.BSOE_SUCCESS)
+#assert(bp.VerifySignature(bootstrap.BootStrapperObject.BSOBJ_BINUTILS) == True)
+#assert(bp.UnpackBinutils() == bootstrap.BSOE.BSOE_SUCCESS)
+#print("unpack error", str(bp.GetLastError()))
 
-assert(bp._CompileTargetBU() == bootstrap.BSOE.BSOE_SUCCESS)
-
+#assert(bp._CompileTargetBU() == bootstrap.BSOE.BSOE_SUCCESS)
+if (bp.DownloadBinUtils("2.42") != True):
+    print("err: ", bp.GetLastError(), bp.GetLastErrorAsString())
 
 #assert(bp._DownloadSourceGCC("13.2.0") == bootstrap.BSOE.BSOE_SUCCESS)
 #assert(bp.UnpackGcc() == bootstrap.BSOE.BSOE_SUCCESS)

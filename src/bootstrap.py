@@ -2,6 +2,7 @@ import subprocess
 
 #import menu
 import os
+from threading import local
 import requests
 from bs4 import BeautifulSoup
 import pathlib
@@ -12,7 +13,7 @@ import sys
 import tarfile
 import shutil
 from subprocess import call
-
+import gnupg
 from enum import IntEnum
 
 
@@ -23,13 +24,10 @@ class BootStrapperOptions(IntEnum):
     BSO_VERIFY_PGP = 1 << 1
     BSO_CLEANUP = 1 << 2
     BSO_MAXCORE = 1 << 3
-    BSO_OUTPUT_VERBOSE = 1 << 4
-    #if not set, provides TUI menu
-    BSO_SCRIPTABLE = 1 << 5
-    BSO_OVERWRITE = 1 << 6
-    BSO_FILE_LOG = 1 << 7
-    BSOE_INIT_LIB = 1 << 8
-    BSOE_OVERWRITE_DOWNLOAD = 1 << 9
+    BSO_OUTPUT_VERBOSE = 1 << 5
+    BSO_FILE_LOG = 1 << 6
+    BSOE_INIT_LIB = 1 << 7
+   
     BSOE_PULL_LATEST = 1 << 10
 class BootStrapperDownloadOpts(IntEnum):
     BSDO_NONE = 0
@@ -60,7 +58,14 @@ class BSOE(IntEnum):
     BSOE_NOT_IMPLEMENTED = 20
     BSOE_SRC_ALR_EXISTS = 21
     BSOE_STAMP_FAIL = 22
+    BSOE_SIGNATURE = 23
+
+class BootStrapperObject(IntEnum):
+    BSOBJ_BINUTILS = 1 << 1
+    BSOBJ_GCC = 1 << 2
+    BSOBJ_LIBGCCs = 1 << 3 
     
+
 
 def MkdirIfNotExists(dir: str) -> None:
     if (not os.path.exists(dir)):
@@ -84,7 +89,7 @@ GNU_GPG_KEYRING="https://ftp.gnu.org/gnu/gnu-keyring.gpg"
 class BootStrapper:
    
     
-    def __init__(self, workDir, installPath, extractPath=None, stampPath=None, options=0, keychainPath=None) -> None:
+    def __init__(self, workDir, installPath, extractPath="", stampPath="", options=0, keychainPath="") -> None:
         #todo make it more flexible using config so it can be changed later
         self.workDir = workDir
         self.installPath = installPath
@@ -137,19 +142,19 @@ class BootStrapper:
             
         
         
-        if (self.stampPath == None):
+        if (self.stampPath == ""):
             self.stampPath = self.workDir
         elif (not CheckDir(self.stampPath)):
             BootStrapper.SetLastError(self, BSOE.BSOE_NOFILE)
             return BSOE.BSOE_NOFILE
         
-        if (self.extractPath == None):
+        if (self.extractPath == ""):
             self.extractPath = self.workDir
         elif (not CheckDir(self.extractPath)):
             BootStrapper.SetLastError(self, BSOE.BSOE_NOFILE)
             return BSOE.BSOE_NOFILE
         
-        if (self.keyChainPath == None):
+        if (self.keyChainPath == ""):
             self.keyChainPath = self.workDir + "/keychain"
             MkdirIfNotExists(self.keyChainPath)
         
@@ -170,7 +175,10 @@ class BootStrapper:
             return BSOE.BSOE_STAMP_FAIL
         
         self._WriteStamp(self.workDir, 'D')
-        return BSOE.BSOE_SUCCESS
+        er = self._DownloadKeychainGNU()
+        
+        
+        return er
     
     
             
@@ -178,11 +186,13 @@ class BootStrapper:
         if (not (self.options & BootStrapperOptions.BSOE_INIT_LIB)):
             return BSOE.BSOE_LIB_NOT_INIT
         
-        self.options &= ~(BootStrapperOptions.BSOE_INIT_LIB)
-        #call cleanup routine here
         
-        self._ClenupStamp()
-        self._DeleteStamp()
+        #call cleanup routine here
+        if (self.options & BootStrapperOptions.BSO_CLEANUP):
+            self._ClenupStamp()
+            self._DeleteStamp()
+        
+        self.options &= ~(BootStrapperOptions.BSOE_INIT_LIB)
         return BSOE.BSOE_SUCCESS
         
         
@@ -229,7 +239,8 @@ class BootStrapper:
                  "Library has been already intialized",
                  "Function/Feature is not currently supported",
                  "Source file already exists",
-                 "Failed to initialize timestamp"]
+                 "Failed to initialize timestamp",
+                 "Failed to check remote or local signature"]
         
         return _errs[err]
     
@@ -302,10 +313,10 @@ class BootStrapper:
             return [response.status_code]
 
     
-    def _DownloadSource(self, url: str, dst: str) -> BSOE:
-        if (os.path.exists(dst) and (not self.options & BootStrapperOptions.BSOE_OVERWRITE_DOWNLOAD)):
+    def _DownloadSource(self, url: str, dst: str, autoStamp=True, overwrite=False) -> BSOE:
+        if (os.path.exists(dst) and overwrite == False):
             BootStrapper.SetLastError(self, BSOE.BSOE_SRC_ALR_EXISTS)
-            return BSOE.BSOE_SUCCESS
+            return BSOE.BSOE_SRC_ALR_EXISTS
         
        
         try:
@@ -324,7 +335,8 @@ class BootStrapper:
             return BSOE.BSOE_RMT_URL
         
         BootStrapper.SetLastError(self, BSOE.BSOE_SUCCESS)
-        self._WriteStamp(self.extractPath + '/'+dst, 'A')
+        if (autoStamp):
+            self._WriteStamp(self.extractPath + '/'+dst, 'A')
         return BSOE.BSOE_SUCCESS
         #todo stamp here
     
@@ -356,14 +368,20 @@ class BootStrapper:
         gccVersion = url.split('/')[-1]
         url = url + '/' + gccVersion + self._filter[0]
     
-        ret = self._DownloadSource(url, self.workDir + gccVersion + self._filter[0])
+        localPath = self.workDir + gccVersion + self._filter[0]
+        ret = self._DownloadSource(url, localPath)
       
     #todo stamp
         if (ret != BSOE.BSOE_SUCCESS):
             return ret
         else:
-            self.ConfigWriteEntry("GCC_DEST_FILE_DOWNLOAD", self.workDir + gccVersion + self._filter[0])
+            ret = self._DownloadSignature(url, localPath + ".sig")
+            if (ret != BSOE.BSOE_SUCCESS):
+                return ret 
+            
+            self.ConfigWriteEntry("GCC_DEST_FILE_DOWNLOAD", localPath)
             self.ConfigWriteEntry("GCC_VERSION", gccVersion)
+            self.ConfigWriteEntry("GCC_SIGNATURE", localPath + ".sig")
             return BSOE.BSOE_SUCCESS
         
     def _DownloadSourceBinutils(self, version) -> BSOE:
@@ -398,8 +416,8 @@ class BootStrapper:
             self.SetLastError(BSOE.BSOE_NOFILE)
             return BSOE.BSOE_NOFILE
         
-        
-        ret = self._DownloadSource(url, self.workDir + buVersion + self._filter[0])
+        localPath = self.workDir + buVersion + self._filter[0]
+        ret = self._DownloadSource(url, localPath)
         
         
         
@@ -409,14 +427,109 @@ class BootStrapper:
         if (ret != BSOE.BSOE_SUCCESS):
             return ret
         else:
-            self.ConfigWriteEntry("BU_DEST_FILE_DOWNLOAD",self.workDir + buVersion + self._filter[0])
+            ret = self._DownloadSignature(url, localPath + ".sig")
+            if (ret != BSOE.BSOE_SUCCESS):
+                return ret 
+            
+            self.ConfigWriteEntry("BU_DEST_FILE_DOWNLOAD",localPath)
             self.ConfigWriteEntry("BU_VERSION", buVersion)
+            self.ConfigWriteEntry("BU_SIGNATURE", localPath + ".sig")
             self.SetLastError(BSOE.BSOE_SUCCESS)
             return BSOE.BSOE_SUCCESS
     
-    def CompileTarget(self, arch, ccOptions) -> BSOE:
-        return BSOE.BSOE_ACCESS_DENIED
-        pass
+    def _DownloadKeychainGNU(self) -> BSOE:
+        if (not self.IsInitialized()):
+            return BSOE.BSOE_LIB_NOT_INIT
+        rv = self._DownloadSource(GNU_GPG_KEYRING, self.keyChainPath + "/gnu-keyring.gpg", overwrite=True)
+        if (rv != BSOE.BSOE_SUCCESS):
+            return rv
+        
+        
+        
+        return BSOE.BSOE_SUCCESS
+    #Downloadds detached signature for the specified object
+    #uri -> url to the source
+    #downloadPath -> local save path
+    def _DownloadSignature(self, uri: str, downloadPath: str) -> BSOE:
+        if (not self.IsInitialized()):
+            return BSOE.BSOE_LIB_NOT_INIT
+        sig = uri + ".sig"
+        
+        rv = self._DownloadSource(sig, downloadPath)
+        if (rv != BSOE.BSOE_SUCCESS):
+            return self.GetLastError()
+        
+        return BSOE.BSOE_SUCCESS
+        
+    def DownloadBinUtils(self, ver: str) -> bool:
+   
+        if (not self._DownloadSourceBinutils(ver) == BSOE.BSOE_SUCCESS):
+            return False
+        if (self.options & BootStrapperOptions.BSO_VERIFY_PGP):
+           
+            if (self.VerifySignature(BootStrapperObject.BSOBJ_BINUTILS) != True):
+                return False
+       
+        if (self.UnpackBinutils() != BSOE.BSOE_SUCCESS):
+            return False
+      
+        
+        if (self._CompileTargetBU() != BSOE.BSOE_SUCCESS):
+            return False
+        
+        return True
+        
+    def VerifySignature(self, bd: BootStrapperObject) ->bool:
+        if (not self.IsInitialized()):
+            return False
+        vals = []
+        if (bd == BootStrapperObject.BSOBJ_BINUTILS):
+            vals = ["BU_SIGNATURE", "BU_DEST_FILE_DOWNLOAD"]
+        elif (bd == BootStrapperObject.BSOBJ_GCC):
+            vals = ["GCC_SIGNATURE", "GCC_DEST_FILE_DOWNLOAD"]
+        else:
+            return False
+        
+        if (self.ConfigGetEntry(vals[0]) != -1 and self.ConfigGetEntry(vals[1]) != -1):
+                rv = self._VerifySignature(str(self.ConfigGetEntry(vals[0])), str(self.ConfigGetEntry(vals[1])))
+                if (rv != BSOE.BSOE_SUCCESS):
+                    self.SetLastError(BSOE.BSOE_SIGNATURE)
+                    return False
+        
+        
+        
+        return True
+
+    def _VerifySignature(self, sig: str, file: str) -> BSOE:
+        if (not self.IsInitialized()):
+            return BSOE.BSOE_LIB_NOT_INIT
+        
+        if (not os.path.exists(sig) or not os.path.isfile(sig)):
+            return BSOE.BSOE_NOFILE
+        
+        ghome = self.keyChainPath + "/gpghome"
+        if (not os.path.exists(ghome)):
+            os.makedirs(ghome, mode=0o700)
+        
+        if (not os.path.isdir(ghome)):
+            return BSOE.BSOE_NOFILE
+        
+        gpg = gnupg.GPG(gnupghome=ghome)
+        gpg.import_keys_file(self.keyChainPath + "/gnu-keyring.gpg")
+        
+        f = open(sig, 'rb')
+        ires = gpg.verify_file(f, file, close_file=True)
+        
+        if (not self._WriteStamp(ghome, 'D')):
+            return BSOE.BSOE_STAMP_FAIL
+        
+        if (ires.valid):
+            return BSOE.BSOE_SUCCESS
+        else:
+            return BSOE.BSOE_SIGNATURE
+            
+    
+   
     
     def _CompileTargetGcc(self) -> BSOE:
         if (not self.IsInitialized()):
@@ -489,8 +602,7 @@ class BootStrapper:
         
         return BSOE.BSOE_SUCCESS
     
-    def VerifyPGP():
-        pass
+    
     def _xcall(self, cmd: str, wd: str) -> int:
         if (not self.IsInitialized()):
             return -1
@@ -526,7 +638,7 @@ class BootStrapper:
             return BSOE.BSOE_INTERNAL
        
       
-        ret = self._UnpackSource(dst)
+        ret = self._UnpackSource(dst, overwrite=True)
         self._WriteStamp(self.extractPath + '/'+buver, 'D')
         self.SetLastError(ret)
         return ret
@@ -545,7 +657,7 @@ class BootStrapper:
         self.SetLastError(ret)
         return ret
     
-    def _UnpackSource(self, src: str) -> BSOE:
+    def _UnpackSource(self, src: str, overwrite=False) -> BSOE:
         if (not self.IsInitialized()):
             self.SetLastError(BSOE.BSOE_LIB_NOT_INIT)
             return BSOE.BSOE_LIB_NOT_INIT
@@ -568,7 +680,7 @@ class BootStrapper:
             self.SetLastError(BSOE.BSOE_LIB_NOT_INIT)
             return BSOE.BSOE_NOFILE
         
-        if (not self.options & BootStrapperOptions.BSO_OVERWRITE):
+        if (overwrite == False):
             if (os.path.exists(self.extractPath + rpath)):
                 self.SetLastError(BSOE.BSOE_LIB_NOT_INIT)
                 return BSOE.BSOE_SRC_ALR_EXISTS
@@ -609,8 +721,13 @@ class BootStrapper:
         return True
     
     def _ClenupStamp(self) -> bool:
+        
+        if (not self.IsInitialized()):
+            return False
+        
         if (not self._CheckStamp()):
-            print("Cleanup failed, stamp doesnt exist")
+          #  print("Cleanup failed, stamp doesnt exist")
+            #err already set by called function
             return False
         f = open(self.stampPath+"/.notice", 'r+')
     
@@ -624,14 +741,14 @@ class BootStrapper:
                 a = ln.rstrip().split()
            
                 if (os.path.exists(a[-1])):
-                    print(f"Cleaning {a[-1]}")
+                   # print(f"Cleaning {a[-1]}")
                     os.remove(a[-1])
 
 
             elif ln.startswith('D'):
                 a = ln.rstrip().split()
                 if (os.path.exists(a[-1])):
-                    print(f"Cleaning tree {a[-1]}")
+                 #   print(f"Cleaning tree {a[-1]}")
                     shutil.rmtree(a[-1])
        
 
@@ -640,38 +757,51 @@ class BootStrapper:
         return True
     
     def _CheckStamp(self) -> bool:
+       
+        if (not self.IsInitialized()):
+            self.SetLastError(BSOE.BSOE_LIB_NOT_INIT)
+            return False
+        
         if (not os.path.exists(self.stampPath + "/.notice")):
+            self.SetLastError(BSOE.BSOE_NOFILE)
             return False
         
         f= open(self.stampPath + "/.notice", "r")
         msg = "#!!!This file has been autogenerated and is used as stamp\n"
         if (f.readline() != msg):
-            print("Not a valid timestamp")
+            
             f.close()
+            self.SetLastError(BSOE.BSOE_IO_FAIL)
             return False
         f.close()
+        self.SetLastError(BSOE.BSOE_SUCCESS)
         return True
         
     def _DeleteStamp(self) -> bool:
+        if (not self.IsInitialized()):
+            self.SetLastError(BSOE.BSOE_LIB_NOT_INIT)
+            return False
         if (not self._CheckStamp()):
             return False
         
         os.remove(self.stampPath + "/.notice")
+        self.SetLastError(BSOE.BSOE_SUCCESS)
         return True
     def _CreateStamp(self) -> bool:
-        if (not os.path.exists(self.stampPath) and not os.path.exists(self.stampPath + "/.notice")):
+        if (not self.IsInitialized()):
+            self.SetLastError(BSOE.BSOE_LIB_NOT_INIT)
             return False
+        if (not os.path.exists(self.stampPath) and not os.path.exists(self.stampPath + "/.notice")):
+            self.SetLastError(BSOE.BSOE_NOFILE)
+            return False
+        
         f = open(f"{self.stampPath}/.notice", "w")
         f.write("#!!!This file has been autogenerated and is used as stamp\n#DO NOT EDIT MANUALLY\n")
         f.close()
+        self.SetLastError(BSOE.BSOE_SUCCESS)
         return True
     
-    def DownloadMenu():
-        pass
-    def OptionsMenu():
-        pass
-    def WorkReportProgress():
-        pass
+   
     # global config instead of locally passed vars
     #example usage: ConfigWrite(CONFIG_CC, "gcc")
     #               ConfigWrite(CONFIG_NPROC, 8)
