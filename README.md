@@ -1,7 +1,8 @@
 # tc-bootsrapper
 ! Warning some changes pushed to the main branch may not work as expected or not at all resulting in broken build.
 In the future there will be automated unit tests and checks before commit.
-For now please use ONLY releases marked as production ready.
+For now please use ONLY releases marked as usable.
+The code is also in very early stage. DO NOT USE IT IN PRODUCTION or any critical tasks.
 
 Easily create a toolchain for os development or cross compiling.
 Support for libgcc without redzone is supported for versions `10`, `12`, `13`
