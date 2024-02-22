@@ -64,9 +64,9 @@ parser.add_argument('-c', "--autoclean", help="Automatically clean all files ins
 parser.add_argument("--gcc_flags", help="GCC specific autoconfig flags", nargs='+')
 parser.add_argument("--binutils_flags", help="Binutils specific autoconfig flags", nargs='+')
 parser.add_argument("--gcc_version", help="Version of GCC to build. If the version is set to lts\
-    The latest supported version supports build without red zone and is fully supported by the tool")
+    The latest supported version supports build without red zone and is fully supported by the tool", nargs='?')
 parser.add_argument("--binutils_version", help="Version of Binutils to build.If the version is set to lts\
-    The latest supported version supports build without red zone and is fully supported by the tool")
+    The latest supported version supports build without red zone and is fully supported by the tool", nargs='?')
 parser.add_argument("--list_gcc", help="Lists all available gcc versions", action="store_true")
 parser.add_argument("--list_binutils", help="Lists all available binutils versions", action="store_true")
 parser.add_argument("-g", "--verify_pgp", help="Verifies PGP signature before installation", action="store_true")
@@ -170,8 +170,7 @@ if (args.targets):
         
         if (args.gcc_version == None or args.gcc_version.lower() == "lts"):
             args.gcc_version = defs.LTS_GCC
-        if (args.binutils_version == None or args.binutils_version.lower() == "lts"):
-            args.binutils_version = defs.LTS_BINUTILS
+    
         
         
         if (args.arch_gcc == None or args.gcc_flags == None or args.gcc_version == None):
@@ -180,6 +179,8 @@ if (args.targets):
         
             
     if ("binutils" in args.targets):
+        if (args.binutils_version == None or args.binutils_version.lower() == "lts"):
+            args.binutils_version = defs.LTS_BINUTILS
         if (args.arch_binutils == None or args.binutils_flags == None or args.binutils_version == None):
             vprint("[!] Binutils specific arguments missing")
             sys.exit(4)
