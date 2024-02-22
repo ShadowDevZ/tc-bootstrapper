@@ -23,3 +23,5 @@ also add things like clean that delete the tarballs and work folder
 - More user friendly output
 - Make this work on non POSIX compliant systems
 - add `requirements.txt` for the pip
+- Create `man` page
+- Create wheel package
