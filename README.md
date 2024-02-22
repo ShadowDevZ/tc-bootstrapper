@@ -1,5 +1,5 @@
 # tc-bootsrapper
-! Warning some changes pushed to the main branch may not work as expected.
+! Warning some changes pushed to the main branch may not work as expected or not at all resulting in broken build.
 In the future there will be automated unit tests and checks before commit.
 For now please use ONLY releases marked as production ready.
 
