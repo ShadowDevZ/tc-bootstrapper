@@ -1,5 +1,5 @@
 --- config.gcc	2024-02-22 21:23:45.699452737 +0100
-+++ config.gcc.bkp	2024-02-22 21:23:40.146508208 +0100
++++ config.gcc	2024-02-22 21:23:40.146508208 +0100
 @@ -1899,6 +1899,7 @@
  	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h newlib-stdint.h i386/i386elf.h"
  	;;

@@ -77,7 +77,6 @@ parser.add_argument("--libgcc_nored", help="Disables support for amd64 red zone,
     certain versions because of the GCC developers rearranging the file with the dependencies on every update. Manual intervention may be required for unsupported versions", action="store_true")
 args = parser.parse_args()
 
-
 if (args.version):
     print("tc-bootstrapper v" + defs.TC_VERSION)
     print("Developed by ShadowDevZ - 2024")
