@@ -1,0 +1,10 @@
+--- config.gcc	2024-02-22 19:08:46.266420665 +0100
++++ config.gcc	2024-02-22 19:09:35.645022640 +0100
+@@ -1865,6 +1865,7 @@
+ 	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h newlib-stdint.h i386/i386elf.h"
+ 	;;
+ x86_64-*-elf*)
++   tmake_file="${tmake_file} i386/x86_64-elf-nored"
+ 	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h"
+ 	;;
+ x86_64-*-rtems*)
