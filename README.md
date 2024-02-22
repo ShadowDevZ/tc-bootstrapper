@@ -1,4 +1,8 @@
 # tc-bootsrapper
+! Warning some changes pushed to the main branch may not work as expected.
+In the future there will be automated unit tests and checks before commit.
+For now please use ONLY releases marked as production ready.
+
 Easily create a toolchain for os development or cross compiling.
 Support for libgcc without redzone is supported for versions `10`, `12`, `13`
 Stable and tested LTS versions are `GCC 13.2.0` and `Binutils 2.42`
