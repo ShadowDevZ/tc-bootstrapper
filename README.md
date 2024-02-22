@@ -6,6 +6,14 @@ Stable and tested LTS versions are `GCC 13.2.0` and `Binutils 2.42`
 Works pretty well now (with code editing), fixing some bugs then i will refacctor
 some things and add argument parsing, prettier output and configuration so multiple
 parts dont need to be rerun multiple times
+# Dependencies
+- Linux system (for now)
+- urllib (py3)
+- patch
+- BeautifulSoup4 (py3)
+- tarfile (py3)
+- shutil (py3)
+- gnupg (py3)
 
 also add things like clean that delete the tarballs and work folder
 
