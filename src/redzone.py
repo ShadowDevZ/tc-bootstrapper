@@ -1,6 +1,5 @@
 from re import sub
 import utils
-
 from defs import *
 import subprocess
 import os
